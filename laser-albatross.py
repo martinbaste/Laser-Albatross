@@ -7,136 +7,132 @@ from Bio.SubsMat import MatrixInfo
 from sys import argv
 import argparse
 
-#Notes: use diversity(genetics) as a value?
 
-#Parameters
-defaultParams = {
-    'conserved':  0.5, # Default is 0.5
-    'highly-conserved': 0.85, # Default is 0.85
-    'cont-non-conserved': 8, #Default is 8 All longer stretches of non-conserved are discarded.
-    'final-length-1': 15, #Default is 15
-    'gaps': 'none', #Default is none
-    'final-length-2' : 10,
-    'infmt': 'fasta',
-    'outfmt': 'fasta'
-    }
+def parseArguments(): #Parse arguments
+    defaultParams = {
+        'conserved':  0.5, # Default is 0.5
+        'highly-conserved': 0.85, # Default is 0.85
+        'cont-non-conserved': 8, #Default is 8 All longer stretches of non-conserved are discarded.
+        'final-length-1': 15, #Default is 15
+        'gaps': 'none', #Default is none
+        'final-length-2' : 10,
+        'infmt': 'fasta',
+        'outfmt': 'fasta'
+        }
 
-desc = "Squeeze out relevant blocks from alignments"
+    desc = "Squeeze out relevant blocks from alignments"
 
-parser = argparse.ArgumentParser(description = desc )
+    parser = argparse.ArgumentParser(description = desc )
 
-parser.add_argument(
-    '-v', '--version',
-    action='version',
-    version='%(prog)s 0.0.1'
-    )
+    parser.add_argument(
+        '-v', '--version',
+        action='version',
+        version='%(prog)s 0.0.1'
+        )
 
-parser.add_argument(
-    'infile',
-    type=argparse.FileType('r')
-    )
+    parser.add_argument(
+        'infile',
+        type=argparse.FileType('r')
+        )
 
-parser.add_argument(
-    '-o', '--outfile',
-    default = False,
-    help = 'Name of file containing the output alignment.',
-    metavar = 'OUT'
-    )
+    parser.add_argument(
+        '-o', '--outfile',
+        default = False,
+        help = 'Name of file containing the output alignment.',
+        metavar = 'OUT'
+        )
 
-parser.add_argument(
-    '-c', '--conserved',
-    type = float,
-    default = defaultParams['conserved'],
-    help = 'A position will be considered conserved if this fraction of sequences plus one have the same value. Default: 0.5',
-    metavar = 'CONS'
-)
+    parser.add_argument(
+        '-c', '--conserved',
+        type = float,
+        default = defaultParams['conserved'],
+        help = 'A position will be considered conserved if this fraction of sequences plus one have the same value. Default: 0.5',
+        metavar = 'CONS'
+        )
 
-parser.add_argument(
-    '-d', '--hconserved',
-    type = float,
-    default = defaultParams['highly-conserved'],
-    help = 'A position will be considered highly conserved if this fraction of sequences plus one have the same value. Default: 0.85',
-    metavar = 'HCONS'
-)
+    parser.add_argument(
+        '-d', '--hconserved',
+        type = float,
+        default = defaultParams['highly-conserved'],
+        help = 'A position will be considered highly conserved if this fraction of sequences plus one have the same value. Default: 0.85',
+        metavar = 'HCONS'
+        )
 
-parser.add_argument(
-    '-e', '--contnoncon',
-    type = int,
-    default = defaultParams['cont-non-conserved'],
-    help = 'Blocks of non-conserved positions longer than this will be removed. Default: 8',
-    metavar = 'CONTNON'
-)
+    parser.add_argument(
+        '-e', '--contnoncon',
+        type = int,
+        default = defaultParams['cont-non-conserved'],
+        help = 'Blocks of non-conserved positions longer than this will be removed. Default: 8',
+        metavar = 'CONTNON'
+        )
 
+    parser.add_argument(
+        '-f', '--finallength1',
+        type = int,
+        default = defaultParams['final-length-1'],
+        help = 'Blocks of valid positions should be at least this long before removing gaps. Default: 15',
+        metavar = 'FL1'
+        )
 
+    parser.add_argument(
+        '-g', '--gaps',
+        choices = ['all', 'none'],
+        default = defaultParams['gaps'],
+        help = "Allow gaps. Default: none."
+        )
 
-parser.add_argument(
-    '-f', '--finallength1',
-    type = int,
-    default = defaultParams['final-length-1'],
-    help = 'Blocks of valid positions should be at least this long before removing gaps. Default: 15',
-    metavar = 'FL1'
-)
+    parser.add_argument(
+        '-i', '--finallength2',
+        type = int,
+        default = defaultParams['final-length-2'],
+        help = 'Blocks of valid positions should be at least this long. Default: 10',
+        metavar = 'FL2'
+        )
 
+    parser.add_argument(
+        '--infmt', '-j',
+        choices = ['fasta'],
+        default = defaultParams['infmt'],
+        help = 'Input format. Default: fasta'
+        )
 
-parser.add_argument(
-    '-g', '--gaps',
-    choices = ['all', 'none'],
-    default = defaultParams['gaps'],
-    help = "Allow gaps. Default: none."
-    )
+    parser.add_argument(
+        '--outfmt', '-p',
+        choices = ['fasta'],
+        default = defaultParams['outfmt'],
+        help = 'Output format. Default: fasta'
+        )
 
-parser.add_argument(
-    '-i', '--finallength2',
-    type = int,
-    default = defaultParams['final-length-2'],
-    help = 'Blocks of valid positions should be at least this long. Default: 10',
-    metavar = 'FL2'
-)
+    parser.add_argument(
+        '--debug',
+        action = 'store_const',
+        const = True,
+        default = False,
+        help = 'Print some information regarding sequence filtering.'
+        )
 
-parser.add_argument(
-    '--infmt', '-j',
-    choices = ['fasta'],
-    default = defaultParams['infmt'],
-    help = 'Input format. Default: fasta'
-    )
+    parser.add_argument(
+        '-D',
+        action = 'store_const',
+        const = True,
+        default = False,
+        help = 'Print accepted blocks positions on output.'
+        )
 
-parser.add_argument(
-    '--outfmt', '-p',
-    choices = ['fasta'],
-    default = defaultParams['outfmt'],
-    help = 'Output format. Default: fasta'
-    )
-
-parser.add_argument(
-    '--debug',
-    action = 'store_const',
-    const = True,
-    default = False,
-    help = 'Print some information regarding sequence filtering.'
-    )
-
-parser.add_argument(
-    '-D',
-    action = 'store_const',
-    const = True,
-    default = False,
-    help = 'Print accepted blocks positions on output.'
-    )
-
-
-args = parser.parse_args()
-filename = args.infile.name
+    args = parser.parse_args()
+    filename = args.infile.name
 
 
-params = {
-    'conserved':  args.conserved, # Default is 0.5
-    'highly-conserved': args.hconserved, # Default is 0.85
-    'cont-non-conserved': args.contnoncon, #Default is 8 All longer stretches of non-conserved are discarded.
-    'final-length-1': args.finallength1, #Default is 15
-    'gaps': args.gaps, #Default is none
-    'final-length-2' : args.finallength2
-    }
-
+    params = {
+        'conserved':  args.conserved, # Default is 0.5
+        'highly-conserved': args.hconserved, # Default is 0.85
+        'cont-non-conserved': args.contnoncon, #Default is 8 All longer stretches of non-conserved are discarded.
+        'final-length-1': args.finallength1, #Default is 15
+        'gaps': args.gaps, #Default is none
+        'final-length-2' : args.finallength2,
+        'filename' : filename
+        }
+    return(params, args)
 
 def allPairs(L):
     L = list(L)
@@ -150,16 +146,15 @@ def scoreMatch(pair, matrix):
     else:
         return matrix[pair]
 
-def filterBlocks(filename, params):
+def filterBlocks( params ):
     #Read alignment file
-    alignment = AlignIO.read(open( filename ), "fasta")
+    alignment = AlignIO.read(open( params['filename'] ), "fasta")
 
     length = alignment.get_alignment_length()
 
     #Step 1 in algorithm
     conserved = (len(alignment) * params['conserved']) + 1
     hConserved = len(alignment) * params['highly-conserved']
-    print(conserved, hConserved)
     blosum = MatrixInfo.blosum62
     info = []
 
@@ -364,13 +359,13 @@ def calculateValidBlocks(alignment, info): #using index 0
 
 
 
-def compareGblocks(alignment, filename):
-    gblocks = AlignIO.read(open("gblocksfiles/" + filename + '-gb'), "fasta")
+def compareGblocks(alignment): #This function compares the alignment to GBlocks output
+    gblocks = AlignIO.read(open("gblocksfiles/" + params['filename'] + '-gb'), "fasta")
 
     gLength = gblocks.get_alignment_length()
     lLength = alignment.get_alignment_length()
     if gLength != lLength:
-        print('Sequence length is not the same for filename {}, LA is {} and GB is {}'.format(filename, lLength, gLength))
+        print('Sequence length is not the same for filename {}, LA is {} and GB is {}'.format(params['filename'], lLength, gLength))
 
     for n in range(max(gLength, lLength)):
         try:
@@ -382,7 +377,7 @@ def compareGblocks(alignment, filename):
         except IndexError:
             l = 'NA'
         if g != l:
-            print('{}: Column {} differs: G: {} and L: {}'.format(filename, n, g, l))
+            print('{}: Column {} differs: G: {} and L: {}'.format(params['filename'], n, g, l))
 
 def writeAlign(alignment, validBlocks, filename, outfmt = 'fasta', detailed = False):
     detail = ''
@@ -398,22 +393,20 @@ def writeAlign(alignment, validBlocks, filename, outfmt = 'fasta', detailed = Fa
             finalAlignment = alignment[:, block[0]:block[1]]
         else:
             finalAlignment += alignment[:, block[0]:block[1]]
-    print(detail)
     for record in finalAlignment:
-        print(record.id + detail)
         record.description = detail
     AlignIO.write([finalAlignment], filename, outfmt)
     return finalAlignment
 
+params, args = parseArguments()
 
-alignment, info = filterBlocks(filename, params)
+alignment, info = filterBlocks(params)
+
 if (args.debug): printAlign(alignment, info)
 validBlocks = calculateValidBlocks(alignment, info)
 
 if not args.outfile:
-    outfile = filename.split('/')[-1].split('.')[:-1]
+    outfile = params['filename'].split('/')[-1].split('.')[:-1]
     outfile = '.'.join(outfile) + '.' + args.outfmt
 
-finalAln = writeAlign(alignment, validBlocks, outfile, args.outfmt, args.D)
-
-#compareGblocks(finalAln, filename)
+writeAlign(alignment, validBlocks, outfile, args.outfmt, args.D)
