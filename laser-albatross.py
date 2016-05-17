@@ -7,8 +7,9 @@ from Bio.SubsMat import MatrixInfo
 from sys import argv
 import argparse
 
+version = '0.0.2'
 
-def parseArguments(): #Parse arguments
+def parseArguments(version): #Parse arguments
     defaultParams = {
         'conserved':  0.5, # Default is 0.5
         'highly-conserved': 0.85, # Default is 0.85
@@ -27,7 +28,7 @@ def parseArguments(): #Parse arguments
     parser.add_argument(
         '-v', '--version',
         action='version',
-        version='%(prog)s 0.0.1'
+        version='%(prog)s ' + version
         )
 
     parser.add_argument(
@@ -398,7 +399,7 @@ def writeAlign(alignment, validBlocks, filename, outfmt = 'fasta', detailed = Fa
     AlignIO.write([finalAlignment], filename, outfmt)
     return finalAlignment
 
-params, args = parseArguments()
+params, args = parseArguments(version)
 
 alignment, info = filterBlocks(params)
 
