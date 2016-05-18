@@ -17,6 +17,7 @@
 * Add new filtering algorithms
 * Refactor code
 
+
 ##Useful info
 
 [Information content](http://www.lecb.ncifcrf.gov/~toms/paper/primer/])

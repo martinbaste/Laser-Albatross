@@ -4,10 +4,10 @@ from Bio import AlignIO
 from Bio.Align import AlignInfo
 from math import ceil
 from Bio.SubsMat import MatrixInfo
-from sys import argv
+import sys
 import argparse
 
-version = '0.0.5'
+version = '0.0.6'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -21,7 +21,7 @@ def parseArguments(version): #Parse arguments
         'outfmt': 'fasta'
         }
 
-    desc = "Squeeze out relevant blocks from alignments"
+    desc = "Squeeze out relevant blocks from alignments."
 
     parser = argparse.ArgumentParser(description = desc )
 
@@ -356,12 +356,13 @@ def printAlign(alignment, info):
     short = True #Short description, long is for debug
     for n in range(length):
         s = alignment[:, n]
-        if short: print('{s} |  MC: {MC[1]} | TS: {TS} | AS: {AS} | {S} '.format(s = s,**info[n]))
+        if short: print('{s} |  MC: {MC[1]} | TS: {TS} | AS: {AS} | {S} '.format(s = s,**info[n]), file = sys.stderr)
         else:
             if info[n]['S'][6] == 'V':
-                print("{} | {}".format(s,n))
+                print("{} | {}".format(s,n), file = sys.stderr)
             else:
-                print("{} | {} - Deleted".format(s,n))
+                print("{} | {} - Deleted".format(s,n), file = sys.stderr)
+
 
 def calculateValidBlocks(alignment, info): #using index 1
     index = 1 #change to 0 to use index 0.
