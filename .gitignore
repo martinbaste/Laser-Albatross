@@ -1,2 +1,5 @@
 *.fasta
-*.phy
+*.phylip
+*.list
+*.clustal
+*.stockholm

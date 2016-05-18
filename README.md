@@ -2,10 +2,13 @@
 
 *Author:* Martín Basterrechea
 
+##Done
+
+* Support for multiple input and output formats
 
 ##Todo
 
-* Add multiple format support (input & output)
+* ~Add multiple format support (input & output)~
 * Add html files with the alignment
 * Add new filtering algorithms
 * Refactor code

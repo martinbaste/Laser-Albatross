@@ -7,7 +7,7 @@ from Bio.SubsMat import MatrixInfo
 from sys import argv
 import argparse
 
-version = '0.0.2'
+version = '0.0.3'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -92,14 +92,14 @@ def parseArguments(version): #Parse arguments
 
     parser.add_argument(
         '--infmt', '-j',
-        choices = ['fasta'],
+        choices = ['fasta', 'clustal', 'phylip', 'emboss', 'stockholm'],
         default = defaultParams['infmt'],
         help = 'Input format. Default: fasta'
         )
 
     parser.add_argument(
         '--outfmt', '-p',
-        choices = ['fasta'],
+        choices = ['fasta', 'clustal', 'phylip', 'stockholm'],
         default = defaultParams['outfmt'],
         help = 'Output format. Default: fasta'
         )
@@ -117,9 +117,22 @@ def parseArguments(version): #Parse arguments
         action = 'store_const',
         const = True,
         default = False,
-        help = 'Print accepted blocks positions on output.'
+        help = "Print accepted blocks positions on output's sequence description. Available for fasta and stockholm formats."
         )
 
+    parser.add_argument(
+        '-V',
+        default = False,
+        help = 'Print valid block ranges to VALIDFILE',
+        metavar = 'VALIDFILE'
+    )
+
+    parser.add_argument(
+        '-I',
+        default = False,
+        help = 'Print discarded block ranges to INVALIDFILE',
+        metavar = 'INVALIDFILE'
+    )
     args = parser.parse_args()
     filename = args.infile.name
 
@@ -340,9 +353,12 @@ def printAlign(alignment, info):
             else:
                 print("{} | {} - Deleted".format(s,n))
 
-def calculateValidBlocks(alignment, info): #using index 0
+def calculateValidBlocks(alignment, info): #using index 1
+    index = 1 #change to 0 to use index 0.
     validBlocks = []
+    invalidBlocks = []
     firstValue = 0
+    firstValueInvalid = 0
     valid = False
     length = alignment.get_alignment_length()
     for n in range(length):
@@ -350,13 +366,18 @@ def calculateValidBlocks(alignment, info): #using index 0
             if not valid:
                 valid = True
                 firstValue = n
-            if valid and n == length-1:
-                validBlocks.append( ( firstValue, n) )
+                invalidBlocks.append( ( firstValueInvalid + index, n - 1 + index) )
+            if valid and n == length - 1:
+                validBlocks.append( ( firstValue + index , n + index ) )
         if info[n]['S'][6] == 'X':
             if valid:
                 valid = False
-                validBlocks.append( ( firstValue, n) )
-    return validBlocks
+                validBlocks.append( ( firstValue + index , n - 1 + index ) )
+                firstValueInvalid = n
+            if not valid and n == length - 1:
+                invalidBlocks.append( ( firstValueInvalid + index , n + index ) )
+
+    return ( validBlocks, invalidBlocks )
 
 
 
@@ -380,13 +401,33 @@ def compareGblocks(alignment): #This function compares the alignment to GBlocks 
         if g != l:
             print('{}: Column {} differs: G: {} and L: {}'.format(params['filename'], n, g, l))
 
-def writeAlign(alignment, validBlocks, filename, outfmt = 'fasta', detailed = False):
-    detail = ''
-    if detailed:
-        details = []
-        for block in validBlocks:
-            details.append(str(block))
-        detail = ', '.join(details)
+def writeAlign(alignment, blocks, filename):
+
+    detailed = args.D
+
+    outfmt = args.outfmt
+
+    validBlocks = blocks[0]
+    invalidBlocks = blocks[1]
+
+    validBlockString = ''
+
+    details = []
+    for block in validBlocks:
+        details.append(str(block))
+    validBlockString = ', '.join(details)
+
+
+    if args.V:
+        with open(args.V, 'w') as o:
+            for block in validBlocks:
+                o.write( '{}\t{}\n'.format( block[0] , block[1] ) )
+
+    if args.I:
+        with open(args.I, 'w') as o:
+            for block in invalidBlocks:
+                o.write( '{}\t{}\n'.format( block[0] , block[1] ) )
+
 
     finalAlignment = False
     for block in validBlocks:
@@ -394,8 +435,9 @@ def writeAlign(alignment, validBlocks, filename, outfmt = 'fasta', detailed = Fa
             finalAlignment = alignment[:, block[0]:block[1]]
         else:
             finalAlignment += alignment[:, block[0]:block[1]]
-    for record in finalAlignment:
-        record.description = detail
+    if detailed:
+        for record in finalAlignment:
+            record.description = validBlockString
     AlignIO.write([finalAlignment], filename, outfmt)
     return finalAlignment
 
@@ -404,10 +446,10 @@ params, args = parseArguments(version)
 alignment, info = filterBlocks(params)
 
 if (args.debug): printAlign(alignment, info)
-validBlocks = calculateValidBlocks(alignment, info)
+blocks = calculateValidBlocks(alignment, info)
 
 if not args.outfile:
     outfile = params['filename'].split('/')[-1].split('.')[:-1]
     outfile = '.'.join(outfile) + '.' + args.outfmt
 
-writeAlign(alignment, validBlocks, outfile, args.outfmt, args.D)
+writeAlign(alignment, blocks, outfile)
