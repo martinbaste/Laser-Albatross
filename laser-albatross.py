@@ -7,7 +7,7 @@ from Bio.SubsMat import MatrixInfo
 from sys import argv
 import argparse
 
-version = '0.0.4'
+version = '0.0.5'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -40,7 +40,7 @@ def parseArguments(version): #Parse arguments
         '-o', '--outfile',
         default = False,
         help = 'Name of file containing the output alignment.',
-        metavar = 'OUT'
+        metavar = 'FILE'
         )
 
     parser.add_argument(
@@ -48,7 +48,7 @@ def parseArguments(version): #Parse arguments
         type = float,
         default = defaultParams['conserved'],
         help = 'A position will be considered conserved if this fraction of sequences plus one have the same value. Default: 0.5',
-        metavar = 'CONS'
+        metavar = 'FLOAT'
         )
 
     parser.add_argument(
@@ -368,7 +368,7 @@ def calculateValidBlocks(alignment, info): #using index 1
     validBlocks = []
     invalidBlocks = []
     firstValue = 0
-    firstValueInvalid = 0
+    firstValueInvalid = -1
     valid = False
     length = alignment.get_alignment_length()
     for n in range(length):
@@ -376,7 +376,8 @@ def calculateValidBlocks(alignment, info): #using index 1
             if not valid:
                 valid = True
                 firstValue = n
-                invalidBlocks.append( ( firstValueInvalid + index, n - 1 + index) )
+                if n != 0:
+                    invalidBlocks.append( ( firstValueInvalid + index, n - 1 + index) )
             if valid and n == length - 1:
                 validBlocks.append( ( firstValue + index , n + index ) )
         if info[n]['S'][6] == 'X':
