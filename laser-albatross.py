@@ -7,7 +7,7 @@ from Bio.SubsMat import MatrixInfo
 from sys import argv
 import argparse
 
-version = '0.0.3'
+version = '0.0.4'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -94,14 +94,16 @@ def parseArguments(version): #Parse arguments
         '--infmt', '-j',
         choices = ['fasta', 'clustal', 'phylip', 'emboss', 'stockholm'],
         default = defaultParams['infmt'],
-        help = 'Input format. Default: fasta'
+        help = 'Input format. Accepted: fasta, clustal, phylip, emboss, stockholm. Default: fasta',
+        metavar = 'INFMT'
         )
 
     parser.add_argument(
         '--outfmt', '-p',
         choices = ['fasta', 'clustal', 'phylip', 'stockholm'],
         default = defaultParams['outfmt'],
-        help = 'Output format. Default: fasta'
+        help = 'Output format. Accepted: fasta, clustal, phylip, stockholm. Default: fasta',
+        metavar = 'OUTFMT'
         )
 
     parser.add_argument(
@@ -125,14 +127,21 @@ def parseArguments(version): #Parse arguments
         default = False,
         help = 'Print valid block ranges to VALIDFILE',
         metavar = 'VALIDFILE'
-    )
+        )
 
     parser.add_argument(
         '-I',
         default = False,
         help = 'Print discarded block ranges to INVALIDFILE',
         metavar = 'INVALIDFILE'
-    )
+        )
+
+    parser.add_argument(
+        '-X',
+        default = False,
+        help = 'Print discarded blocks to FILE',
+        metavar = 'FILE'
+        )
     args = parser.parse_args()
     filename = args.infile.name
 
@@ -182,7 +191,7 @@ def filterBlocks( params ):
             else:
                 chars[i] = 1
 
-        mostCommon = ('-', 1)
+        mostCommon = ('-', 0)
         for key in chars.keys():
             if chars[key] > mostCommon[1]:
                 mostCommon = (key, chars[key])
@@ -192,11 +201,13 @@ def filterBlocks( params ):
         if mostCommon[1] > hConserved:
             status = 'H' # Highly conserved
 
-        status2 = 'X' # Non conserved
-        if mostCommon[1] >= conserved:
-            status2 = 'C' # Conserved
-        if mostCommon[1] >= hConserved:
-            status2 = 'H' # Highly conserved
+        #Count gaps
+        gaps = chars['-']
+
+        if params['gaps'] == 'none':
+            if gaps:
+                status = 'X'
+
 
         score = 0
         count = 0
@@ -208,13 +219,12 @@ def filterBlocks( params ):
             avgScore = 0
         else:
             avgScore = score / count
-        #Count gaps
-        gaps = chars['-']
+
 
         info.append({
         'TS': score,
         'AS': avgScore,
-        'S': {1 : status, 1.5 : status2 },
+        'S': {1 : status },
         'MC': mostCommon,
         'G': gaps
         })
@@ -379,28 +389,6 @@ def calculateValidBlocks(alignment, info): #using index 1
 
     return ( validBlocks, invalidBlocks )
 
-
-
-def compareGblocks(alignment): #This function compares the alignment to GBlocks output
-    gblocks = AlignIO.read(open("gblocksfiles/" + params['filename'] + '-gb'), "fasta")
-
-    gLength = gblocks.get_alignment_length()
-    lLength = alignment.get_alignment_length()
-    if gLength != lLength:
-        print('Sequence length is not the same for filename {}, LA is {} and GB is {}'.format(params['filename'], lLength, gLength))
-
-    for n in range(max(gLength, lLength)):
-        try:
-            g = gblocks[:, n]
-        except IndexError:
-            g = 'NA'
-        try:
-            l = alignment[:, n]
-        except IndexError:
-            l = 'NA'
-        if g != l:
-            print('{}: Column {} differs: G: {} and L: {}'.format(params['filename'], n, g, l))
-
 def writeAlign(alignment, blocks, filename):
 
     detailed = args.D
@@ -439,6 +427,26 @@ def writeAlign(alignment, blocks, filename):
         for record in finalAlignment:
             record.description = validBlockString
     AlignIO.write([finalAlignment], filename, outfmt)
+
+    if args.X:
+        invalidBlockString = ''
+
+        details = []
+        for block in invalidBlocks:
+            details.append(str(block))
+        invalidBlockString = ', '.join(details)
+        invalidAlignment = False
+        for block in invalidBlocks:
+            if not invalidAlignment:
+                invalidAlignment = alignment[:, block[0]:block[1]]
+            else:
+                invalidAlignment += alignment[:, block[0]:block[1]]
+        if detailed:
+            for record in invalidAlignment:
+                record.description = invalidBlockString
+        AlignIO.write([invalidAlignment], args.X, outfmt)
+
+
     return finalAlignment
 
 params, args = parseArguments(version)

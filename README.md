@@ -5,15 +5,17 @@
 ##Done
 
 * Support for multiple input and output formats
+* Print rejected blocks
+* Print accepted and rejected block ranges
+* Support for gaps
+
+
 
 ##Todo
 
-* ~Add multiple format support (input & output)~
 * Add html files with the alignment
 * Add new filtering algorithms
 * Refactor code
-* Add option to print rejected Blocks
-* Support gaps in filter
 
 ##Useful info
 
