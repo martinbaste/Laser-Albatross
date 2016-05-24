@@ -6,6 +6,7 @@ from math import ceil
 from Bio.SubsMat import MatrixInfo
 import sys
 import argparse
+import json
 
 version = '0.0.6'
 
@@ -141,6 +142,13 @@ def parseArguments(version): #Parse arguments
         default = False,
         help = 'Print discarded blocks to FILE',
         metavar = 'FILE'
+        )
+    parser.add_argument(
+        '-J',
+        action = 'store_const',
+        default = False,
+        const = True,
+        help = 'Print valid blocks to JSON file'
         )
     args = parser.parse_args()
     filename = args.infile.name
@@ -428,7 +436,17 @@ def writeAlign(alignment, blocks, filename):
     if detailed:
         for record in finalAlignment:
             record.description = validBlockString
-    AlignIO.write([finalAlignment], filename, outfmt)
+
+    if args.J: #JSON
+        seqArray = []
+        for record in finalAlignment:
+            seqArray.append({'name': record.name ,'id': record.id ,'seq': str(record.seq) })
+        with open(filename + '.JSON', 'w') as j:
+            json.dump(seqArray, j, sort_keys=True, indent=4)
+
+
+    outFilename = filename + '.' + args.outfmt
+    AlignIO.write([finalAlignment], outFilename, outfmt)
 
     if args.X:
         invalidBlockString = ''
@@ -451,6 +469,8 @@ def writeAlign(alignment, blocks, filename):
 
     return finalAlignment
 
+
+
 params, args = parseArguments(version)
 
 alignment, info = filterBlocks(params)
@@ -460,6 +480,6 @@ blocks = calculateValidBlocks(alignment, info)
 
 if not args.outfile:
     outfile = params['filename'].split('/')[-1].split('.')[:-1]
-    outfile = '.'.join(outfile) + '.' + args.outfmt
+    outfile = '.'.join(outfile)
 
 writeAlign(alignment, blocks, outfile)
