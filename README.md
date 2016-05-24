@@ -16,11 +16,12 @@
 * Add html files with the alignment
 * Add new filtering algorithms
 * Refactor code
+* Add partial gap support: don't consider them as a valid character (they don't count towards the conserved or non conserved calculation of the position)
 
 
 ##Useful info
 
-[Information content](http://www.lecb.ncifcrf.gov/~toms/paper/primer/])
+[Information content](http://www.lecb.ncifcrf.gov/~toms/paper/primer/)
 
 ##Notes
 
