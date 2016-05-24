@@ -13,6 +13,12 @@
     <div id='feature'></div>
 
     <script>
+      var gffParser = msa.io.gff;
+      var xhr = msa.io.xhr;
+      xhr("https://raw.githubusercontent.com/martinbaste/Laser-Albatross/html-output/test.gff", function(err, request, body) {
+        var features = gffParser.parseSeqs(body);
+        m.seqs.addFeatures(features);
+      });
       var seqs = [
           {
               "id": "Ht",

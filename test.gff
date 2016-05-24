@@ -1,2 +1,5 @@
-Ht	Ensembl	Repeat	4	20	42	.	.	hid=trf; hstart=1; hend=21
-Pb	Ensembl	Repeat	4	25	42	.	.	hid=trf; hstart=1; hend=21
+##gff-version 3
+Ht . gene	10 	15	.	.  .  Name=A feature;Color=blue
+Ht . gene	30 	40	.	.  .  Name=B feature
+Pb . gene 	4	10	.	.	. Name=C feature;Color=blue
+Pb . gene 	5	15	.	.	. Name=D feature
