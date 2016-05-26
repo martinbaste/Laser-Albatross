@@ -10,7 +10,7 @@ import sys
 import argparse
 import json
 
-version = '0.0.8'
+version = '0.1.0'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -190,7 +190,8 @@ def filterBlocks(params):
     hConserved = len(alignment) * params['highly-conserved']
     blosum = MatrixInfo.blosum62
     info = []
-
+    allGaps = params['gaps'] == 'all' #Some things have to be calculated
+                                        #differently if there are all gaps
     for n in range(length):
         s = alignment[:, n]
         chars = {}
@@ -204,18 +205,26 @@ def filterBlocks(params):
         mostCommon = ('-', 0)
         for key in chars.keys():
             if chars[key] > mostCommon[1]:
-                if not (params['gaps'] == 'partial' and key == '-'):
+                if not (allGaps and key == '-'):
                     mostCommon = (key, chars[key])
 
+        # In this case gaps don't count towards the "conserved" requirement, so
+        # if there are gaps, the required frequency for an aminoacid to be
+        # "conserved" is less.
+
+        if allGaps:
+            conserved = ((len(alignment) - chars['-']) * params['conserved']) + 1
+            hConserved = (len(alignment) - chars['-']) * params['highly-conserved']
         status = 'X' # Non conserved
-        if mostCommon[1] > conserved:
+        if mostCommon[1] >= conserved:
             status = 'C' # Conserved
-        if mostCommon[1] > hConserved:
+        if mostCommon[1] >= hConserved:
             status = 'H' # Highly conserved
 
         #Count gaps
         gaps = chars['-']
 
+        #Only "none" for gaps makes the position count as non-conserved.
         if params['gaps'] == 'none':
             if gaps:
                 status = 'X'
@@ -309,7 +318,7 @@ def filterBlocks(params):
             n['S'][4] = 'X' # Invalid
             count = 0
 
-    #Step 5
+    #Step 5 #Filter out gaps if none are allowed
     if params['gaps'] == 'none':
         cutting = True
         for i in range(len(info)):
@@ -371,15 +380,18 @@ def printAlign(alignment, info):
     #Print valid columns
     length = alignment.get_alignment_length()
     short = True #Short description, long is for debug
+    count = 0
     for n in range(length):
         s = alignment[:, n]
+        if info[n]['S'][6] == 'V':
+            count += 1
         if short: print('{s} |  MC: {MC[1]} | TS: {TS} | AS: {AS:.2} | {S} '.format(s = s,**info[n]), file = sys.stderr)
         else:
             if info[n]['S'][6] == 'V':
                 print("{} | {}".format(s,n), file = sys.stderr)
             else:
                 print("{} | {} - Deleted".format(s,n), file = sys.stderr)
-
+    print(count, file = sys.stderr)
 def calculateMetadata(alignment, info):
     metadata = {}
     #Calculate valid blocks using index 1 and valid string
