@@ -25,14 +25,14 @@ An example for the difference of partial and all using the standard settings ("c
 In this alignment:
 
 
-    \---
-    \---
+    ---
+    ---
     VWQ
     AWL
     VWQ
     VWQ
     AWQ
-    \---
+    ---
 
 
 Position 1 has 3 gaps. With *partial* setting they are considered another character. No characters are above the *conserved* threshold so this position is *non conserved*. With *all* settings, the threshold is lower ((0.5 * 5 ) + 1), 3.5, but no other character is above this threshold so this is *not conserved*.
