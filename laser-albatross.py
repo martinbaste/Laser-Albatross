@@ -10,7 +10,7 @@ import sys
 import argparse
 import json
 
-version = '0.0.7'
+version = '0.0.8'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -80,7 +80,7 @@ def parseArguments(version): #Parse arguments
 
     parser.add_argument(
         '-g', '--gaps',
-        choices = ['all', 'none'],
+        choices = ['all', 'partial', 'none'],
         default = defaultParams['gaps'],
         help = "Allow gaps. Default: none."
         )
@@ -179,7 +179,7 @@ def scoreMatch(pair, matrix):
     else:
         return matrix[pair]
 
-def filterBlocks( params ):
+def filterBlocks(params):
     #Read alignment file
     alignment = AlignIO.read(open( params['filename'] ), "fasta")
 
@@ -204,7 +204,9 @@ def filterBlocks( params ):
         mostCommon = ('-', 0)
         for key in chars.keys():
             if chars[key] > mostCommon[1]:
-                mostCommon = (key, chars[key])
+                if not (params['gaps'] == 'partial' and key == '-'):
+                    mostCommon = (key, chars[key])
+
         status = 'X' # Non conserved
         if mostCommon[1] > conserved:
             status = 'C' # Conserved
@@ -233,7 +235,7 @@ def filterBlocks( params ):
 
         info.append({
         'TS': score,
-        'AS': avgScore,
+        'AS': float(avgScore),
         'S': {1 : status },
         'MC': mostCommon,
         'G': gaps
@@ -359,12 +361,11 @@ def filterBlocks( params ):
             count = 0
     return(alignment, info)
 
-def getInitialJson( alignment ):
+def getInitialJson(alignment):
      seqArray = []
      for record in alignment:
          seqArray.append({'name': record.name ,'id': record.id ,'seq': str(record.seq) })
      return json.dumps(seqArray, sort_keys=True, indent=4)
-
 
 def printAlign(alignment, info):
     #Print valid columns
@@ -372,13 +373,12 @@ def printAlign(alignment, info):
     short = True #Short description, long is for debug
     for n in range(length):
         s = alignment[:, n]
-        if short: print('{s} |  MC: {MC[1]} | TS: {TS} | AS: {AS} | {S} '.format(s = s,**info[n]), file = sys.stderr)
+        if short: print('{s} |  MC: {MC[1]} | TS: {TS} | AS: {AS:.2} | {S} '.format(s = s,**info[n]), file = sys.stderr)
         else:
             if info[n]['S'][6] == 'V':
                 print("{} | {}".format(s,n), file = sys.stderr)
             else:
                 print("{} | {} - Deleted".format(s,n), file = sys.stderr)
-
 
 def calculateMetadata(alignment, info):
     metadata = {}
@@ -558,27 +558,30 @@ def htmlOutput(initialJson, seqJson):
     return html.replace("sequences2@", initialJson).replace("sequences@", seqJson)
 
 
+def main():
+    global args
+    params, args = parseArguments(version)
 
-params, args = parseArguments(version)
+    alignment, info = filterBlocks(params)
+    metadata = calculateMetadata(alignment, info)
 
-alignment, info = filterBlocks(params)
-metadata = calculateMetadata(alignment, info)
+    initialJson = ''
+    if args.H:
+        # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
+        validSeq = Seq(metadata['validString'])
+        validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
+        alignment.append(validSeqRecord)
+        initialJson = getInitialJson(alignment)
+        alignment = alignment[:-1]
 
-initialJson = ''
-if args.H:
-    # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
-    validSeq = Seq(metadata['validString'])
-    validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
-    alignment.append(validSeqRecord)
-    initialJson = getInitialJson(alignment)
-    alignment = alignment[:-1]
+    if (args.debug): printAlign(alignment, info)
 
-if (args.debug): printAlign(alignment, info)
+    blocks = metadata['blocks']
 
-blocks = metadata['blocks']
+    if not args.outfile:
+        outfile = params['filename'].split('/')[-1].split('.')[:-1]
+        outfile = '.'.join(outfile)
 
-if not args.outfile:
-    outfile = params['filename'].split('/')[-1].split('.')[:-1]
-    outfile = '.'.join(outfile)
+    writeAlign(alignment, metadata, outfile, initialJson)
 
-writeAlign(alignment, metadata, outfile, initialJson)
+main()
