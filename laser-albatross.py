@@ -4,10 +4,13 @@ from Bio import AlignIO
 from Bio.Align import AlignInfo
 from math import ceil
 from Bio.SubsMat import MatrixInfo
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 import sys
 import argparse
+import json
 
-version = '0.0.6'
+version = '0.0.7'
 
 def parseArguments(version): #Parse arguments
     defaultParams = {
@@ -141,6 +144,13 @@ def parseArguments(version): #Parse arguments
         default = False,
         help = 'Print discarded blocks to FILE',
         metavar = 'FILE'
+        )
+    parser.add_argument(
+        '-H',
+        action = 'store_const',
+        default = False,
+        const = True,
+        help = 'Create HTML output file.'
         )
     args = parser.parse_args()
     filename = args.infile.name
@@ -349,6 +359,12 @@ def filterBlocks( params ):
             count = 0
     return(alignment, info)
 
+def getInitialJson( alignment ):
+     seqArray = []
+     for record in alignment:
+         seqArray.append({'name': record.name ,'id': record.id ,'seq': str(record.seq) })
+     return json.dumps(seqArray, sort_keys=True, indent=4)
+
 
 def printAlign(alignment, info):
     #Print valid columns
@@ -364,16 +380,23 @@ def printAlign(alignment, info):
                 print("{} | {} - Deleted".format(s,n), file = sys.stderr)
 
 
-def calculateValidBlocks(alignment, info): #using index 1
+def calculateMetadata(alignment, info):
+    metadata = {}
+    #Calculate valid blocks using index 1 and valid string
     index = 1 #change to 0 to use index 0.
     validBlocks = []
     invalidBlocks = []
     firstValue = 0
     firstValueInvalid = -1
     valid = False
+
+    validString = ''
+
+
     length = alignment.get_alignment_length()
     for n in range(length):
         if info[n]['S'][6] == 'V':
+            validString += 'X'
             if not valid:
                 valid = True
                 firstValue = n
@@ -382,21 +405,25 @@ def calculateValidBlocks(alignment, info): #using index 1
             if valid and n == length - 1:
                 validBlocks.append( ( firstValue + index , n + index ) )
         if info[n]['S'][6] == 'X':
+            validString += '.'
             if valid:
                 valid = False
                 validBlocks.append( ( firstValue + index , n - 1 + index ) )
                 firstValueInvalid = n
             if not valid and n == length - 1:
                 invalidBlocks.append( ( firstValueInvalid + index , n + index ) )
+    metadata['blocks'] = ( validBlocks, invalidBlocks )
+    metadata['validString'] = validString
 
-    return ( validBlocks, invalidBlocks )
 
-def writeAlign(alignment, blocks, filename):
+    return metadata
+
+def writeAlign(alignment, metadata, filename, initialJson):
 
     detailed = args.D
 
     outfmt = args.outfmt
-
+    blocks = metadata['blocks']
     validBlocks = blocks[0]
     invalidBlocks = blocks[1]
 
@@ -428,7 +455,22 @@ def writeAlign(alignment, blocks, filename):
     if detailed:
         for record in finalAlignment:
             record.description = validBlockString
-    AlignIO.write([finalAlignment], filename, outfmt)
+
+    if args.H: #JSON
+
+
+
+        seqArray = []
+        for record in finalAlignment:
+            seqArray.append({'name': record.name ,'id': record.id ,'seq': str(record.seq) })
+
+        jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
+        with open(filename + '.html', 'w') as h:
+            h.write(htmlOutput(initialJson, jsonSeq))
+
+
+    outFilename = filename + '.' + args.outfmt
+    AlignIO.write([finalAlignment], outFilename, outfmt)
 
     if args.X:
         invalidBlockString = ''
@@ -451,15 +493,92 @@ def writeAlign(alignment, blocks, filename):
 
     return finalAlignment
 
+def htmlOutput(initialJson, seqJson):
+    html = """<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8">
+        <link type="text/css" rel="stylesheet" href="https://cdn.rawgit.com/wilzbach/msa/master/css/msa.css">
+      </head>
+      <body>
+
+        <script src="https://cdn.bio.sh/msa/0.4/msa.min.gz.js"></script>
+
+
+        <div id='initialDiv'></div>
+        <div id='finalDiv'></div>
+
+        <script>
+          var gffParser = msa.io.gff;
+          var xhr = msa.io.xhr;
+
+          var seqs = sequences@
+          var initialSeqs = sequences2@
+          var rootDiv = document.getElementById('initialDiv');
+          /* global rootDiv */
+          // set your custom properties
+
+          var opts = {
+            seqs : initialSeqs,
+            el : rootDiv
+          };
+
+
+          // init msa
+          var i = new msa.msa(opts);
+
+          renderMSA(i);
+          function renderMSA(m) {
+
+              // the menu is independent to the MSA container
+              var menuOpts = {};
+              menuOpts.el = document.getElementById('div');
+              menuOpts.msa = m;
+              menuOpts.menu = "small";
+              var defMenu = new msa.menu.defaultmenu(menuOpts);
+              m.addView("menu", defMenu);
+
+              // call render at the end to display the whole MSA
+              m.render();
+          }
+
+          var finalDiv = document.getElementById('finalDiv');
+
+          var opts = {
+            seqs : seqs,
+            el : finalDiv
+          };
+          var f = new msa.msa(opts);
+
+          renderMSA(f);
+
+        </script>
+      </body>
+    </html>"""
+    return html.replace("sequences2@", initialJson).replace("sequences@", seqJson)
+
+
+
 params, args = parseArguments(version)
 
 alignment, info = filterBlocks(params)
+metadata = calculateMetadata(alignment, info)
+
+initialJson = ''
+if args.H:
+    # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
+    validSeq = Seq(metadata['validString'])
+    validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
+    alignment.append(validSeqRecord)
+    initialJson = getInitialJson(alignment)
+    alignment = alignment[:-1]
 
 if (args.debug): printAlign(alignment, info)
-blocks = calculateValidBlocks(alignment, info)
+
+blocks = metadata['blocks']
 
 if not args.outfile:
     outfile = params['filename'].split('/')[-1].split('.')[:-1]
-    outfile = '.'.join(outfile) + '.' + args.outfmt
+    outfile = '.'.join(outfile)
 
-writeAlign(alignment, blocks, outfile)
+writeAlign(alignment, metadata, outfile, initialJson)
