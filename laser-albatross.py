@@ -6,6 +6,7 @@ from math import ceil
 from Bio.SubsMat import MatrixInfo
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+from Bio.Align import MultipleSeqAlignment
 import sys
 import argparse
 import json
@@ -181,8 +182,11 @@ def scoreMatch(pair, matrix):
 
 def filterBlocks(params):
     #Read alignment file
-    alignment = AlignIO.read(open( params['filename'] ), "fasta")
 
+    alignment = AlignIO.read(open( params['filename'] ), args.infmt )
+    #except ValueError as err:
+    #    print('Error while opening the file: {}'.format(err), file = sys.stderr)
+    #    exit()
     length = alignment.get_alignment_length()
 
     #Step 1 in algorithm
@@ -373,7 +377,7 @@ def filterBlocks(params):
 def getInitialJson(alignment):
      seqArray = []
      for record in alignment:
-         seqArray.append({'name': record.name ,'id': record.id ,'seq': str(record.seq) })
+         seqArray.append({'name': record.id ,'seq': str(record.seq) })
      return json.dumps(seqArray, sort_keys=True, indent=4)
 
 def printAlign(alignment, info):
@@ -474,7 +478,7 @@ def writeAlign(alignment, metadata, filename, initialJson):
 
         seqArray = []
         for record in finalAlignment:
-            seqArray.append({'name': record.name ,'id': record.id ,'seq': str(record.seq) })
+            seqArray.append({'name': record.id ,'seq': str(record.seq) })
 
         jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
         with open(filename + '.html', 'w') as h:
@@ -482,7 +486,10 @@ def writeAlign(alignment, metadata, filename, initialJson):
 
 
     outFilename = filename + '.' + args.outfmt
-    AlignIO.write([finalAlignment], outFilename, outfmt)
+    if finalAlignment:
+        AlignIO.write([finalAlignment], outFilename, outfmt)
+    else:
+        print("All positions were removed, try lowering the thresholds.", file = sys.stderr)
 
     if args.X:
         invalidBlockString = ''
@@ -532,7 +539,10 @@ def htmlOutput(initialJson, seqJson):
 
           var opts = {
             seqs : initialSeqs,
-            el : rootDiv
+            el : rootDiv,
+            vis: {
+                labelId: false
+            }
           };
 
 
@@ -543,7 +553,7 @@ def htmlOutput(initialJson, seqJson):
           function renderMSA(m) {
 
               // the menu is independent to the MSA container
-              var menuOpts = {};
+              var menuOpts = {vis : {labelId : false} };
               menuOpts.el = document.getElementById('div');
               menuOpts.msa = m;
               menuOpts.menu = "small";
@@ -558,7 +568,10 @@ def htmlOutput(initialJson, seqJson):
 
           var opts = {
             seqs : seqs,
-            el : finalDiv
+            el : finalDiv,
+            vis: {
+                labelId: false
+            }
           };
           var f = new msa.msa(opts);
 
@@ -582,9 +595,11 @@ def main():
         # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
         validSeq = Seq(metadata['validString'])
         validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
-        alignment.append(validSeqRecord)
-        initialJson = getInitialJson(alignment)
-        alignment = alignment[:-1]
+        jsonAlignment = MultipleSeqAlignment([validSeqRecord])
+        for record in alignment:
+            jsonAlignment.append(record)
+        print(jsonAlignment)
+        initialJson = getInitialJson(jsonAlignment)
 
     if (args.debug): printAlign(alignment, info)
 

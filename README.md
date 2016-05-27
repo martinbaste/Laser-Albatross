@@ -5,6 +5,7 @@
 ## Done
 
 * Support for multiple input and output formats
+* It works for both nucleotide and amino acid sequences.
 * Print rejected blocks
 * Print accepted and rejected block ranges
 * Support for gaps
@@ -54,7 +55,6 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 * Info-score info added as a new track
 * Maybe integrate with bash pipes? check emboss
 * Add support for ambiguous characters
-* Check that it works for nucleotides
 * Add polydot chart?
 
 
