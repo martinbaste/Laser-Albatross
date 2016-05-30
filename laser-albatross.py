@@ -120,7 +120,7 @@ def parseArguments(version): #Parse arguments
 
     parser.add_argument(
         '-x', '--windowscore',
-        type = int,
+        type = float,
         default = defaultParams['windowScore'],
         help = 'Window score above this threshold will be taken out (for window mode). Default: {}'.format(defaultParams['windowScore']),
         metavar = 'VALUE'
@@ -249,7 +249,8 @@ def filterBlocks(params):
             elif i in chmGroup['rest']:
                 charGr['r'] += 1
             else:
-                charGr['o'] += 1
+                if not (allGaps and i == '-'):
+                    charGr['o'] += 1
 
         mostCommon = ('-', 0)
         for key in chars.keys():
@@ -260,10 +261,12 @@ def filterBlocks(params):
         # In this case gaps don't count towards the "conserved" requirement, so
         # if there are gaps, the required frequency for an aminoacid to be
         # "conserved" is less.
-
+        numSeq = len(alignment)
         if allGaps:
-            conserved = ((len(alignment) - chars['-']) * params['conserved']) + 1
-            hConserved = (len(alignment) - chars['-']) * params['highly-conserved']
+            numSeq -= chars['-']
+        if allGaps:
+            conserved = (numSeq * params['conserved']) + 1
+            hConserved = numSeq * params['highly-conserved']
         status = 'X' # Non conserved
         if mostCommon[1] >= conserved:
             status = 'C' # Conserved
@@ -272,11 +275,13 @@ def filterBlocks(params):
 
         heterozygosity = 1
         for key in chars.keys():
-            heterozygosity -= (chars[key]/len(alignment))**2
+            if key != '-':
+                heterozygosity -= (chars[key]/numSeq)**2
 
         heterozygosityGroup = 1
         for key in charGr.keys():
-            heterozygosityGroup -= (charGr[key]/len(alignment))**2
+            if key != '-':
+                heterozygosityGroup -= (charGr[key]/numSeq)**2
 
         #Count gaps
         gaps = chars['-']
@@ -437,11 +442,17 @@ def filterBlocks(params):
                 for i in range(wSize):
                     info[n+i]['S'][6] = 'X'
             if not 6 in info[n]['S']:
-                info[n]['S'][6] = 'V'
+                if params['gaps'] == 'none' and info[n]['G'] != 0:
+                    info[n]['S'][6] = 'X'
+                else:
+                    info[n]['S'][6] = 'V'
             if n == length - wSize - 1:
                 for i in range(wSize + 1):
                     if not 6 in info[n+i]['S']:
-                        info[n+i]['S'][6] = 'V'
+                        if params['gaps'] == 'none' and info[n+i]['G'] != 0:
+                            info[n+i]['S'][6] = 'X'
+                        else:
+                            info[n+i]['S'][6] = 'V'
             info[n]['H'] = avgScore
 
 
