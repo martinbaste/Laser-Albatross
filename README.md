@@ -46,8 +46,7 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 
 
 ## Todo
-
-
+* Score looks really interesting, maybe it can be added a chemical group score and then average.
 * Add new filtering algorithms
 * Refactor code
 * Maybe have both alignments in the html scroll at the same time.
@@ -56,6 +55,7 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 * Maybe integrate with bash pipes? check emboss
 * Add support for ambiguous characters
 * Add polydot chart?
+* Clean params/args stuff
 
 
 ## Useful info

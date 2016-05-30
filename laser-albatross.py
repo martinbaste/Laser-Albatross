@@ -2,7 +2,7 @@
 
 from Bio import AlignIO
 from Bio.Align import AlignInfo
-from math import ceil
+from math import ceil, floor
 from Bio.SubsMat import MatrixInfo
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -13,6 +13,13 @@ import json
 
 version = '0.1.1'
 
+chmGroup = { #Taken from http://www.ebi.ac.uk/Tools/msa/clustalw2/help/faq.html#24
+    'small' : 'AVFPMILW',
+    'acidic' : 'DE',
+    'basic' : 'RK',
+    'rest' : 'STYHCNGQ' # Hydroxyl + sulfhydryl + amine + G
+}
+
 def parseArguments(version): #Parse arguments
     defaultParams = {
         'conserved':  0.5, # Default is 0.5
@@ -22,7 +29,9 @@ def parseArguments(version): #Parse arguments
         'gaps': 'none', #Default is none
         'final-length-2' : 10,
         'infmt': 'fasta',
-        'outfmt': 'fasta'
+        'outfmt': 'fasta',
+        'windowSize' : 5,
+        'windowScore' : 7,
         }
 
     desc = "Squeeze out relevant blocks from alignments."
@@ -38,6 +47,13 @@ def parseArguments(version): #Parse arguments
     parser.add_argument(
         'infile',
         type=argparse.FileType('r')
+        )
+
+    parser.add_argument(
+        '-m', '--mode',
+        choices = ['gblocks', 'window'],
+        default = 'gblocks',
+        help = "Use GBlocks or Window mode."
         )
 
     parser.add_argument(
@@ -92,6 +108,22 @@ def parseArguments(version): #Parse arguments
         default = defaultParams['final-length-2'],
         help = 'Blocks of valid positions should be at least this long. Default: 10',
         metavar = 'FL2'
+        )
+
+    parser.add_argument(
+        '-w', '--windowsize',
+        type = int,
+        default = defaultParams['windowSize'],
+        help = 'Window size (for window mode). Default: {}'.format(defaultParams['windowSize']),
+        metavar = 'VALUE'
+        )
+
+    parser.add_argument(
+        '-x', '--windowscore',
+        type = int,
+        default = defaultParams['windowScore'],
+        help = 'Window score above this threshold will be taken out (for window mode). Default: {}'.format(defaultParams['windowScore']),
+        metavar = 'VALUE'
         )
 
     parser.add_argument(
@@ -164,7 +196,9 @@ def parseArguments(version): #Parse arguments
         'final-length-1': args.finallength1, #Default is 15
         'gaps': args.gaps, #Default is none
         'final-length-2' : args.finallength2,
-        'filename' : filename
+        'filename' : filename,
+        'windowScore' : args.windowscore,
+        'windowSize' : args.windowsize,
         }
     return(params, args)
 
@@ -200,11 +234,22 @@ def filterBlocks(params):
         s = alignment[:, n]
         chars = {}
         chars['-'] = 0 #For gap counting
+        charGr = { 's': 0, 'a' : 0, 'b' : 0, 'r' : 0, 'o' : 0}
         for i in s:
             if i in chars:
                 chars[i] += 1
             else:
                 chars[i] = 1
+            if i in chmGroup['small']:
+                charGr['s'] += 1
+            elif i in chmGroup['acidic']:
+                charGr['a'] += 1
+            elif i in chmGroup['basic']:
+                charGr['b'] += 1
+            elif i in chmGroup['rest']:
+                charGr['r'] += 1
+            else:
+                charGr['o'] += 1
 
         mostCommon = ('-', 0)
         for key in chars.keys():
@@ -224,6 +269,14 @@ def filterBlocks(params):
             status = 'C' # Conserved
         if mostCommon[1] >= hConserved:
             status = 'H' # Highly conserved
+
+        heterozygosity = 1
+        for key in chars.keys():
+            heterozygosity -= (chars[key]/len(alignment))**2
+
+        heterozygosityGroup = 1
+        for key in charGr.keys():
+            heterozygosityGroup -= (charGr[key]/len(alignment))**2
 
         #Count gaps
         gaps = chars['-']
@@ -247,131 +300,153 @@ def filterBlocks(params):
 
 
         info.append({
+        'H' : (heterozygosity + heterozygosityGroup)/2,
         'TS': score,
         'AS': float(avgScore),
         'S': {1 : status },
         'MC': mostCommon,
         'G': gaps
         })
+    if args.mode == 'gblocks':
+        # Step 2
 
-    # Step 2
-
-    count = 0
-    for i in range(len(info)):
-        n = info[i]
-        if n['S'][1] == 'X':
-            count += 1
-            if count == params['cont-non-conserved'] + 1:
-                for j in range(count):
-                    info[i-j]['S'][2] = 'X'
-            elif count > params['cont-non-conserved'] + 1:
-                n['S'][2] = 'X' # Invalid
-            else:
-                n['S'][2] = 'V' # Valid
-
-        else:
-            n['S'][2] = 'V' # Valid
-            count = 0
-
-    #Step 3 First from the beginning to the end, then backwards
-    block = False
-    for i in range(len(info)):
-        n = info[i]
-        if n['S'][2] == 'V' and not block:
-            if n['S'][1] == 'H':
-                n['S'][3] = 'V'
-                block = True
-            else:
-                n['S'][3] = 'X'
-        elif n['S'][2] == 'X':
-            block = False
-            n['S'][3] = 'X'
-        else:
-            n['S'][3] = 'V'
-    block = False
-    for i in range(len(info),0, -1):
-        n = info[i-1]
-        if n['S'][2] == 'V' and not block:
-            if n['S'][1] == 'H':
-                n['S'][3] = 'V'
-                block = True
-            else:
-                n['S'][3] = 'X'
-        elif n['S'][2] == 'X':
-            block = False
-            n['S'][3] = 'X'
-        elif n['S'][2] == 'V' and block:
-            n['S'][3] = 'V'
-
-    #Step 4
-
-    count = 0
-    for i in range(len(info)):
-        n = info[i]
-        if n['S'][3] == 'V':
-            count += 1
-            if count == params['final-length-1']: #Block is longer, save previous positions
-                for j in range(count):
-                    info[i-j]['S'][4] = 'V'
-            elif count > params['final-length-1']:
-                n['S'][4] = 'V' # Valid
-            else: #Count is less than FL1
-                n['S'][4] = 'X' # Invalid
-
-        else:
-            n['S'][4] = 'X' # Invalid
-            count = 0
-
-    #Step 5 #Filter out gaps if none are allowed
-    if params['gaps'] == 'none':
-        cutting = True
+        count = 0
         for i in range(len(info)):
             n = info[i]
-            if n['S'][4] == 'V' and n['G'] > 0 and not cutting:
-                n['S'][5] = 'X' #No gaps allowed
-                cutting = True
-                for j in range(i):
-                    p = info[i-j]
-                    if p['S'][5] == 'V' and p['S'][1] == 'X': #If previous is valid and non conserved, take it out
-                        p['S'][5] = 'X'   #Possible bug in GBlocks, it doesnt go back
-                        a = 0
-                    elif p['S'][5] == 'V' and p['S'][1] != 'X':
-                        break #We found the last non-conserved block, break loop
-            elif n['S'][4] == 'V' and n['G'] == 0 and not cutting:
-                n['S'][5] = 'V'
-            elif n['S'][4] == 'V' and cutting:
-                if n['S'][1] == 'X':
-                    n['S'][5] = 'X'
-                elif n['G'] > 0:
-                    n['S'][5] = 'X'
+            if n['S'][1] == 'X':
+                count += 1
+                if count == params['cont-non-conserved'] + 1:
+                    for j in range(count):
+                        info[i-j]['S'][2] = 'X'
+                elif count > params['cont-non-conserved'] + 1:
+                    n['S'][2] = 'X' # Invalid
                 else:
+                    n['S'][2] = 'V' # Valid
+
+            else:
+                n['S'][2] = 'V' # Valid
+                count = 0
+
+        #Step 3 First from the beginning to the end, then backwards
+        block = False
+        for i in range(len(info)):
+            n = info[i]
+            if n['S'][2] == 'V' and not block:
+                if n['S'][1] == 'H':
+                    n['S'][3] = 'V'
+                    block = True
+                else:
+                    n['S'][3] = 'X'
+            elif n['S'][2] == 'X':
+                block = False
+                n['S'][3] = 'X'
+            else:
+                n['S'][3] = 'V'
+        block = False
+        for i in range(len(info),0, -1):
+            n = info[i-1]
+            if n['S'][2] == 'V' and not block:
+                if n['S'][1] == 'H':
+                    n['S'][3] = 'V'
+                    block = True
+                else:
+                    n['S'][3] = 'X'
+            elif n['S'][2] == 'X':
+                block = False
+                n['S'][3] = 'X'
+            elif n['S'][2] == 'V' and block:
+                n['S'][3] = 'V'
+
+        #Step 4
+
+        count = 0
+        for i in range(len(info)):
+            n = info[i]
+            if n['S'][3] == 'V':
+                count += 1
+                if count == params['final-length-1']: #Block is longer, save previous positions
+                    for j in range(count):
+                        info[i-j]['S'][4] = 'V'
+                elif count > params['final-length-1']:
+                    n['S'][4] = 'V' # Valid
+                else: #Count is less than FL1
+                    n['S'][4] = 'X' # Invalid
+
+            else:
+                n['S'][4] = 'X' # Invalid
+                count = 0
+
+        #Step 5 #Filter out gaps if none are allowed
+        if params['gaps'] == 'none':
+            cutting = True
+            for i in range(len(info)):
+                n = info[i]
+                if n['S'][4] == 'V' and n['G'] > 0 and not cutting:
+                    n['S'][5] = 'X' #No gaps allowed
+                    cutting = True
+                    for j in range(i):
+                        p = info[i-j]
+                        if p['S'][5] == 'V' and p['S'][1] == 'X': #If previous is valid and non conserved, take it out
+                            p['S'][5] = 'X'   #Possible bug in GBlocks, it doesnt go back
+                            a = 0
+                        elif p['S'][5] == 'V' and p['S'][1] != 'X':
+                            break #We found the last non-conserved block, break loop
+                elif n['S'][4] == 'V' and n['G'] == 0 and not cutting:
                     n['S'][5] = 'V'
-                    cutting = False
-            elif n['S'][4] == 'X':
-                n['S'][5] = 'X'
-    else:
-        for n in info:
-            n['S'][5] = n['S'][4]
-
-
-    #Step 6
-
-    count = 0
-    for i in range(len(info)):
-        n = info[i]
-        if n['S'][5] == 'V':
-            count += 1
-            if count == params['final-length-2']: #Block is longer, save previous positions
-                for j in range(count):
-                    info[i-j]['S'][6] = 'V'
-            elif count > params['final-length-2']:
-                n['S'][6] = 'V' # Valid
-            else: #Count is less than FL2
-                n['S'][6] = 'X' # Invalid
-
+                elif n['S'][4] == 'V' and cutting:
+                    if n['S'][1] == 'X':
+                        n['S'][5] = 'X'
+                    elif n['G'] > 0:
+                        n['S'][5] = 'X'
+                    else:
+                        n['S'][5] = 'V'
+                        cutting = False
+                elif n['S'][4] == 'X':
+                    n['S'][5] = 'X'
         else:
-            n['S'][6] = 'X' # Invalid
-            count = 0
+            for n in info:
+                n['S'][5] = n['S'][4]
+
+
+        #Step 6
+
+        count = 0
+        for i in range(len(info)):
+            n = info[i]
+            if n['S'][5] == 'V':
+                count += 1
+                if count == params['final-length-2']: #Block is longer, save previous positions
+                    for j in range(count):
+                        info[i-j]['S'][6] = 'V'
+                elif count > params['final-length-2']:
+                    n['S'][6] = 'V' # Valid
+                else: #Count is less than FL2
+                    n['S'][6] = 'X' # Invalid
+
+            else:
+                n['S'][6] = 'X' # Invalid
+                count = 0
+    elif args.mode == 'window':
+        wSize = params['windowSize']
+        for n in range(length - wSize):
+            scoreSum = 0
+            for i in range(wSize):
+                scoreSum += info[n+i]['H']
+            avgScore = scoreSum / wSize
+            if avgScore * 10 >= params['windowScore']:
+                for i in range(wSize):
+                    info[n+i]['S'][6] = 'X'
+            if not 6 in info[n]['S']:
+                info[n]['S'][6] = 'V'
+            if n == length - wSize - 1:
+                for i in range(wSize + 1):
+                    if not 6 in info[n+i]['S']:
+                        info[n+i]['S'][6] = 'V'
+            info[n]['H'] = avgScore
+
+
+
+
     return(alignment, info)
 
 def getInitialJson(alignment):
@@ -385,17 +460,26 @@ def printAlign(alignment, info):
     length = alignment.get_alignment_length()
     short = True #Short description, long is for debug
     count = 0
+    freq = [0]*10
+    f = open('numbers','w')
     for n in range(length):
+        freq[floor(info[n]['H']*10)] += 1
+        f.write(str(info[n]['H']) + '\n')
         s = alignment[:, n]
         if info[n]['S'][6] == 'V':
             count += 1
-        if short: print('{s} |  MC: {MC[1]} | TS: {TS} | AS: {AS:.2} | {S} '.format(s = s,**info[n]), file = sys.stderr)
+        if short: print('{s} |  H: {H} | MC: {MC[1]} | TS: {TS} | AS: {AS:.2} | {S} '.format(s = s,**info[n]), file = sys.stderr)
         else:
             if info[n]['S'][6] == 'V':
                 print("{} | {}".format(s,n), file = sys.stderr)
             else:
                 print("{} | {} - Deleted".format(s,n), file = sys.stderr)
     print(count, file = sys.stderr)
+    for n in range(len(freq)):
+        freq[n] = freq[n]/length
+    print(freq)
+    f.close()
+
 def calculateMetadata(alignment, info):
     metadata = {}
     #Calculate valid blocks using index 1 and valid string
@@ -407,10 +491,11 @@ def calculateMetadata(alignment, info):
     valid = False
 
     validString = ''
-
+    scoreString = ''
 
     length = alignment.get_alignment_length()
     for n in range(length):
+        scoreString += str(int(floor(info[n]['H']*10)))
         if info[n]['S'][6] == 'V':
             validString += 'X'
             if not valid:
@@ -430,6 +515,7 @@ def calculateMetadata(alignment, info):
                 invalidBlocks.append( ( firstValueInvalid + index , n + index ) )
     metadata['blocks'] = ( validBlocks, invalidBlocks )
     metadata['validString'] = validString
+    metadata['scoreString'] = scoreString
 
 
     return metadata
@@ -465,9 +551,9 @@ def writeAlign(alignment, metadata, filename, initialJson):
     finalAlignment = False
     for block in validBlocks:
         if not finalAlignment:
-            finalAlignment = alignment[:, block[0]:block[1]]
+            finalAlignment = alignment[:, block[0]-1:block[1]]
         else:
-            finalAlignment += alignment[:, block[0]:block[1]]
+            finalAlignment += alignment[:, block[0]-1:block[1]]
     if detailed:
         for record in finalAlignment:
             record.description = validBlockString
@@ -595,10 +681,11 @@ def main():
         # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
         validSeq = Seq(metadata['validString'])
         validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
-        jsonAlignment = MultipleSeqAlignment([validSeqRecord])
+        scoreSeq = Seq(metadata['scoreString'])
+        scoreSeqRecord = SeqRecord(seq = scoreSeq, id = 'Sc', name = 'Heterozygosity Score')
+        jsonAlignment = MultipleSeqAlignment([validSeqRecord, scoreSeqRecord])
         for record in alignment:
             jsonAlignment.append(record)
-        print(jsonAlignment)
         initialJson = getInitialJson(jsonAlignment)
 
     if (args.debug): printAlign(alignment, info)
