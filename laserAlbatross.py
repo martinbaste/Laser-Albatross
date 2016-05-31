@@ -202,9 +202,9 @@ def parseArguments(version): #Parse arguments
         'filename' : filename,
         'windowScore' : args.windowscore,
         'windowSize' : args.windowsize,
-        'mode' : args.mode
+        'mode' : args.mode,
         'infmt': args.infmt,
-        'outfmt': args.outfmt,
+        'outfmt': args.outfmt
         }
     return(params, args)
 
