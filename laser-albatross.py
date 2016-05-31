@@ -20,19 +20,22 @@ chmGroup = { #Taken from http://www.ebi.ac.uk/Tools/msa/clustalw2/help/faq.html#
     'rest' : 'STYHCNGQ' # Hydroxyl + sulfhydryl + amine + G
 }
 
+defaultParams = {
+    'conserved':  0.5, # Default is 0.5
+    'highly-conserved': 0.85, # Default is 0.85
+    'cont-non-conserved': 8, #Default is 8 All longer stretches of non-conserved are discarded.
+    'final-length-1': 15, #Default is 15
+    'gaps': 'none', #Default is none
+    'final-length-2' : 10,
+    'infmt': 'fasta',
+    'outfmt': 'fasta',
+    'windowSize' : 5,
+    'windowScore' : 7,
+    'mode' : 'window'
+    }
+
 def parseArguments(version): #Parse arguments
-    defaultParams = {
-        'conserved':  0.5, # Default is 0.5
-        'highly-conserved': 0.85, # Default is 0.85
-        'cont-non-conserved': 8, #Default is 8 All longer stretches of non-conserved are discarded.
-        'final-length-1': 15, #Default is 15
-        'gaps': 'none', #Default is none
-        'final-length-2' : 10,
-        'infmt': 'fasta',
-        'outfmt': 'fasta',
-        'windowSize' : 5,
-        'windowScore' : 7,
-        }
+
 
     desc = "Squeeze out relevant blocks from alignments."
 
@@ -52,7 +55,7 @@ def parseArguments(version): #Parse arguments
     parser.add_argument(
         '-m', '--mode',
         choices = ['gblocks', 'window'],
-        default = 'gblocks',
+        default = defaultParams['mode'],
         help = "Use GBlocks or Window mode."
         )
 
@@ -106,7 +109,7 @@ def parseArguments(version): #Parse arguments
         '-i', '--finallength2',
         type = int,
         default = defaultParams['final-length-2'],
-        help = 'Blocks of valid positions should be at least this long. Default: 10',
+        help = 'Blocks of valid positions should be at least this long. Default: {}'.format(defaultParams['final-length-2']),
         metavar = 'FL2'
         )
 
@@ -130,7 +133,7 @@ def parseArguments(version): #Parse arguments
         '--infmt', '-j',
         choices = ['fasta', 'clustal', 'phylip', 'emboss', 'stockholm'],
         default = defaultParams['infmt'],
-        help = 'Input format. Accepted: fasta, clustal, phylip, emboss, stockholm. Default: fasta',
+        help = 'Input format. Accepted: fasta, clustal, phylip, emboss, stockholm. Default: {}'.format(defaultParams['infmt']),
         metavar = 'INFMT'
         )
 
@@ -138,7 +141,7 @@ def parseArguments(version): #Parse arguments
         '--outfmt', '-p',
         choices = ['fasta', 'clustal', 'phylip', 'stockholm'],
         default = defaultParams['outfmt'],
-        help = 'Output format. Accepted: fasta, clustal, phylip, stockholm. Default: fasta',
+        help = 'Output format. Accepted: fasta, clustal, phylip, stockholm. Default: {}'.format(defaultParams['outfmt']),
         metavar = 'OUTFMT'
         )
 
@@ -199,6 +202,7 @@ def parseArguments(version): #Parse arguments
         'filename' : filename,
         'windowScore' : args.windowscore,
         'windowSize' : args.windowsize,
+        'mode' : args.mode
         }
     return(params, args)
 
@@ -214,10 +218,10 @@ def scoreMatch(pair, matrix):
     else:
         return matrix[pair]
 
-def filterBlocks(params):
+def filterBlocks(params, filehandle):
     #Read alignment file
 
-    alignment = AlignIO.read(open( params['filename'] ), args.infmt )
+    alignment = AlignIO.read( filehandle, args.infmt )
     #except ValueError as err:
     #    print('Error while opening the file: {}'.format(err), file = sys.stderr)
     #    exit()
@@ -685,7 +689,8 @@ def main():
     global args
     params, args = parseArguments(version)
 
-    alignment, info = filterBlocks(params)
+    filehandle = open( params['filename'] )
+    alignment, info = filterBlocks(params, filehandle)
     metadata = calculateMetadata(alignment, info)
 
     initialJson = ''
@@ -710,4 +715,5 @@ def main():
 
     writeAlign(alignment, metadata, outfile, initialJson)
 
-main()
+if __name__ == "__main__":
+    main()
