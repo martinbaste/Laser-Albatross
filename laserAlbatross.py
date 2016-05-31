@@ -218,9 +218,10 @@ def scoreMatch(pair, matrix):
     else:
         return matrix[pair]
 
-def filterBlocks(params, filehandle):
+def filterBlocks(filehandle, params = None):
     #Read alignment file
-
+    if params == None:
+        params = defaultParams
     alignment = AlignIO.read( filehandle, args.infmt )
     #except ValueError as err:
     #    print('Error while opening the file: {}'.format(err), file = sys.stderr)
@@ -690,7 +691,7 @@ def main():
     params, args = parseArguments(version)
 
     filehandle = open( params['filename'] )
-    alignment, info = filterBlocks(params, filehandle)
+    alignment, info = filterBlocks(filehandle, params)
     metadata = calculateMetadata(alignment, info)
 
     initialJson = ''
