@@ -16,7 +16,6 @@
   * *Partial:* Gaps are considered just another allowed character.
   * *All:* Gaps positions are not removed, and they don't count towards the conserved or non conserved calculation of the position. This means that the required amount of identical characters for a position is lower.
 * Info-score info in HTML output
-* Score looks really interesting, maybe it can be added a chemical group score and then average.
 
 
 
@@ -54,6 +53,8 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 * Add polydot chart?
 * Clean params/args stuff
 * Automatic score threshold calculation
+* Score looks really interesting, maybe it can be added a chemical group score and then average.
+
 
 
 ## Useful info
