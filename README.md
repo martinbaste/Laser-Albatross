@@ -15,7 +15,8 @@
   * *None:* Gaps are considered non-conserved positions and are taken out.
   * *Partial:* Gaps are considered just another allowed character.
   * *All:* Gaps positions are not removed, and they don't count towards the conserved or non conserved calculation of the position. This means that the required amount of identical characters for a position is lower.
-
+* Info-score info in HTML output
+* Score looks really interesting, maybe it can be added a chemical group score and then average.
 
 
 
@@ -46,16 +47,13 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 
 
 ## Todo
-* Score looks really interesting, maybe it can be added a chemical group score and then average.
-* Add new filtering algorithms
 * Refactor code
 * Maybe have both alignments in the html scroll at the same time.
-* Maybe add score/information content/conservation info to HTML
-* Info-score info added as a new track
 * Maybe integrate with bash pipes? check emboss
 * Add support for ambiguous characters
 * Add polydot chart?
 * Clean params/args stuff
+* Automatic score threshold calculation
 
 
 ## Useful info

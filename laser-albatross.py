@@ -574,8 +574,9 @@ def writeAlign(alignment, metadata, filename, initialJson):
 
 
         seqArray = []
-        for record in finalAlignment:
-            seqArray.append({'name': record.id ,'seq': str(record.seq) })
+        if finalAlignment:
+            for record in finalAlignment:
+                seqArray.append({'name': record.id ,'seq': str(record.seq) })
 
         jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
         with open(filename + '.html', 'w') as h:
