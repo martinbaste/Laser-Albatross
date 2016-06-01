@@ -220,11 +220,11 @@ def scoreMatch(pair, matrix):
     else:
         return matrix[pair]
 
-def filterBlocks(filehandle, params = None):
+def filterBlocks(filename, params = None):
     #Read alignment file
     if params == None:
         params = defaultParams
-    alignment = AlignIO.read( filehandle, args.infmt )
+    alignment = AlignIO.read( open(filename, 'rU'), params['infmt'] )
     #except ValueError as err:
     #    print('Error while opening the file: {}'.format(err), file = sys.stderr)
     #    exit()
@@ -319,7 +319,7 @@ def filterBlocks(filehandle, params = None):
         'MC': mostCommon,
         'G': gaps
         })
-    if args.mode == 'gblocks':
+    if params['mode'] == 'gblocks':
         # Step 2
 
         count = 0
@@ -438,7 +438,7 @@ def filterBlocks(filehandle, params = None):
             else:
                 n['S'][6] = 'X' # Invalid
                 count = 0
-    elif args.mode == 'window':
+    elif params['mode'] == 'window':
         wSize = params['windowSize']
         for n in range(length - wSize):
             scoreSum = 0
@@ -647,7 +647,8 @@ def htmlOutput(initialJson, seqJson):
             el : rootDiv,
             vis: {
                 labelId: false
-            }
+            },
+            colorscheme : {'scheme' : 'clustal2'}
           };
 
 
@@ -676,7 +677,8 @@ def htmlOutput(initialJson, seqJson):
             el : finalDiv,
             vis: {
                 labelId: false
-            }
+            },
+            colorscheme : {'scheme' : 'clustal2'}
           };
           var f = new msa.msa(opts);
 
@@ -688,12 +690,47 @@ def htmlOutput(initialJson, seqJson):
     return html.replace("sequences2@", initialJson).replace("sequences@", seqJson)
 
 
+def getHTMLCGI(filename, params = None): #Return HTML output for CGI script
+    alignment, info = filterBlocks(filename, params)
+    #Delete file
+    metadata = calculateMetadata(alignment, info)
+
+    initialJson = ''
+    validSeq = Seq(metadata['validString'])
+    validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
+    scoreSeq = Seq(metadata['scoreString'])
+    scoreSeqRecord = SeqRecord(seq = scoreSeq, id = 'Sc', name = 'Heterozygosity Score')
+    jsonAlignment = MultipleSeqAlignment([validSeqRecord, scoreSeqRecord])
+    for record in alignment:
+        jsonAlignment.append(record)
+    initialJson = getInitialJson(jsonAlignment)
+
+    validBlocks = metadata['blocks'][0]
+    invalidBlocks = metadata['blocks'][1]
+
+
+
+    finalAlignment = False
+    for block in validBlocks:
+        if not finalAlignment:
+            finalAlignment = alignment[:, block[0]-1:block[1]]
+        else:
+            finalAlignment += alignment[:, block[0]-1:block[1]]
+
+    seqArray = []
+    if finalAlignment:
+        for record in finalAlignment:
+            seqArray.append({'name': record.id ,'seq': str(record.seq) })
+
+    jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
+    return(htmlOutput(initialJson, jsonSeq))
+
+
 def main():
     global args
     params, args = parseArguments(version)
 
-    filehandle = open( params['filename'] )
-    alignment, info = filterBlocks(filehandle, params)
+    alignment, info = filterBlocks(params['filename'], params)
     metadata = calculateMetadata(alignment, info)
 
     initialJson = ''
