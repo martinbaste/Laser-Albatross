@@ -538,7 +538,7 @@ def calculateMetadata(alignment, info):
 
     return metadata
 
-def writeAlign(alignment, metadata, filename, initialJson):
+def writeAlign(alignment, metadata, filename, initialJson, info):
 
     detailed = args.D
 
@@ -587,7 +587,7 @@ def writeAlign(alignment, metadata, filename, initialJson):
 
         jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
         with open(filename + '.html', 'w') as h:
-            h.write(htmlOutput(initialJson, jsonSeq))
+            h.write(htmlOutput(initialJson, jsonSeq, info))
 
 
     outFilename = filename + '.' + args.outfmt
@@ -617,80 +617,116 @@ def writeAlign(alignment, metadata, filename, initialJson):
 
     return finalAlignment
 
-def htmlOutput(initialJson, seqJson):
-    html = """<!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8">
-        <link type="text/css" rel="stylesheet" href="https://cdn.rawgit.com/wilzbach/msa/master/css/msa.css">
-      </head>
-      <body>
+def htmlOutput(initialJson, seqJson, info, header = True):
+    x = []
+    y = []
+    p = [] # Present
+    for n in range(len(info)):
+        x.append(n+1)
+        y.append(int(floor(info[n]['H']*10)))
+        if info[n]['S'][6] == 'V':
+            p.append(0)
+        else:
+            p.append(10)
+    script = """
+    <script>
+        TESTER = document.getElementById('tester');
+        trace1 = {{
+        x: {0} ,
+        y: {1},
+        type : 'scatter'
+        }};
 
-        <script src="https://cdn.bio.sh/msa/0.4/msa.min.gz.js"></script>
+        trace2 = {{
+        x: {0} ,
+        y: {2},
+        type: 'bar'
+        }};
 
+        data = [trace1, trace2];
+        Plotly.plot( TESTER, data , {{margin : {{t : 0}} }});
+    </script>""".format(x, y, p)
 
-        <div id='initialDiv'></div>
-        <div id='finalDiv'></div>
+    head = """
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <title>Laser Albatross - Martín Basterrechea</title>
+    <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+    <link rel="stylesheet" href="https://cdn.rawgit.com/wilzbach/msa/master/css/msa.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>"""
+    html = """
+<body>
 
-        <script>
-          var gffParser = msa.io.gff;
-          var xhr = msa.io.xhr;
+    <script src="https://cdn.bio.sh/msa/0.4/msa.min.gz.js"></script>
 
-          var seqs = sequences@
-          var initialSeqs = sequences2@
-          var rootDiv = document.getElementById('initialDiv');
-          /* global rootDiv */
-          // set your custom properties
+    <div id="tester" style="width:1200px;height:250px;"></div>
+    <div id='initialDiv'></div>
+    <div id='finalDiv'></div>
 
-          var opts = {
-            seqs : initialSeqs,
-            el : rootDiv,
-            vis: {
-                labelId: false
-            },
-            colorscheme : {'scheme' : 'clustal2'}
-          };
+    <script>
+      var gffParser = msa.io.gff;
+      var xhr = msa.io.xhr;
 
+      var seqs = sequences@
+      var initialSeqs = sequences2@
+      var rootDiv = document.getElementById('initialDiv');
+      /* global rootDiv */
+      // set your custom properties
 
-          // init msa
-          var i = new msa.msa(opts);
-
-          renderMSA(i);
-          function renderMSA(m) {
-
-              // the menu is independent to the MSA container
-              var menuOpts = {vis : {labelId : false} };
-              menuOpts.el = document.getElementById('div');
-              menuOpts.msa = m;
-              menuOpts.menu = "small";
-              var defMenu = new msa.menu.defaultmenu(menuOpts);
-              m.addView("menu", defMenu);
-
-              // call render at the end to display the whole MSA
-              m.render();
-          }
-
-          var finalDiv = document.getElementById('finalDiv');
-
-          var opts = {
-            seqs : seqs,
-            el : finalDiv,
-            vis: {
-                labelId: false
-            },
-            colorscheme : {'scheme' : 'clustal2'}
-          };
-          var f = new msa.msa(opts);
-
-          renderMSA(f);
-
-        </script>
-      </body>
-    </html>"""
-    return html.replace("sequences2@", initialJson).replace("sequences@", seqJson)
+      var opts = {
+        seqs : initialSeqs,
+        el : rootDiv,
+        vis: {
+            labelId: false
+        },
+        colorscheme : {'scheme' : 'clustal2'}
+      };
 
 
-def getHTMLCGI(filename, params = None): #Return HTML output for CGI script
+      // init msa
+      var i = new msa.msa(opts);
+
+      renderMSA(i);
+      function renderMSA(m) {
+
+          // the menu is independent to the MSA container
+          var menuOpts = {vis : {labelId : false} };
+          menuOpts.el = document.getElementById('div');
+          menuOpts.msa = m;
+          menuOpts.menu = "small";
+          var defMenu = new msa.menu.defaultmenu(menuOpts);
+          m.addView("menu", defMenu);
+
+          // call render at the end to display the whole MSA
+          m.render();
+      }
+
+      var finalDiv = document.getElementById('finalDiv');
+
+      var opts = {
+        seqs : seqs,
+        el : finalDiv,
+        vis: {
+            labelId: false
+        },
+        colorscheme : {'scheme' : 'clustal2'}
+      };
+      var f = new msa.msa(opts);
+
+      renderMSA(f);
+
+    </script>
+    plotscript
+  </body>
+</html>"""
+    if header:
+        return header + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
+    return html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
+
+
+def getCGI(filename, params = None): #Return HTML output for CGI script
     alignment, info = filterBlocks(filename, params)
     #Delete file
     metadata = calculateMetadata(alignment, info)
@@ -723,7 +759,8 @@ def getHTMLCGI(filename, params = None): #Return HTML output for CGI script
             seqArray.append({'name': record.id ,'seq': str(record.seq) })
 
     jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
-    return(htmlOutput(initialJson, jsonSeq))
+
+    return(htmlOutput(initialJson, jsonSeq, info, header=False))
 
 
 def main():
@@ -753,7 +790,7 @@ def main():
         outfile = params['filename'].split('/')[-1].split('.')[:-1]
         outfile = '.'.join(outfile)
 
-    writeAlign(alignment, metadata, outfile, initialJson)
+    writeAlign(alignment, metadata, outfile, initialJson, info)
 
 if __name__ == "__main__":
     main()

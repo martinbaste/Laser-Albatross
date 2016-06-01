@@ -46,6 +46,7 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 
 
 ## Todo
+* Accept parameters and take rest from default
 * Refactor code
 * Maybe have both alignments in the html scroll at the same time.
 * Maybe integrate with bash pipes? check emboss
