@@ -31,7 +31,10 @@ defaultParams = {
     'outfmt': 'fasta',
     'windowSize' : 5,
     'windowScore' : 7,
-    'mode' : 'window'
+    'mode' : 'window',
+    'H' : False,
+    'debug' : False,
+    'detailed' : False
     }
 
 def parseArguments(version): #Parse arguments
@@ -49,6 +52,7 @@ def parseArguments(version): #Parse arguments
 
     parser.add_argument(
         'infile',
+        nargs = '+',
         type=argparse.FileType('r')
         )
 
@@ -59,12 +63,6 @@ def parseArguments(version): #Parse arguments
         help = "Use GBlocks or Window mode."
         )
 
-    parser.add_argument(
-        '-o', '--outfile',
-        default = False,
-        help = 'Name of file containing the output alignment.',
-        metavar = 'FILE'
-        )
 
     parser.add_argument(
         '-c', '--conserved',
@@ -149,7 +147,7 @@ def parseArguments(version): #Parse arguments
         '--debug',
         action = 'store_const',
         const = True,
-        default = False,
+        default = defaultParams['debug'],
         help = 'Print some information regarding sequence filtering.'
         )
 
@@ -157,7 +155,7 @@ def parseArguments(version): #Parse arguments
         '-D',
         action = 'store_const',
         const = True,
-        default = False,
+        default = defaultParams['detailed'],
         help = "Print accepted blocks positions on output's sequence description. Available for fasta and stockholm formats."
         )
 
@@ -184,13 +182,14 @@ def parseArguments(version): #Parse arguments
     parser.add_argument(
         '-H',
         action = 'store_const',
-        default = False,
+        default = defaultParams['H'],
         const = True,
         help = 'Create HTML output file.'
         )
     args = parser.parse_args()
-    filename = args.infile.name
-
+    filenames = []
+    for files in args.infile:
+        filenames.append(files.name)
 
     params = {
         'conserved':  args.conserved, # Default is 0.5
@@ -199,14 +198,20 @@ def parseArguments(version): #Parse arguments
         'final-length-1': args.finallength1, #Default is 15
         'gaps': args.gaps, #Default is none
         'final-length-2' : args.finallength2,
-        'filename' : filename,
+        'filenames' : filenames,
         'windowScore' : args.windowscore,
         'windowSize' : args.windowsize,
         'mode' : args.mode,
         'infmt': args.infmt,
-        'outfmt': args.outfmt
+        'outfmt': args.outfmt,
+        'H' : args.H,
+        'debug' : args.debug,
+        'detailed' : args.D,
+        'validRange' : args.V,
+        'invalidRange' : args.I,
+        'discardedBlocks' : args.X
         }
-    return(params, args)
+    return params
 
 def allPairs(L):
     L = list(L)
@@ -539,9 +544,9 @@ def calculateMetadata(alignment, info):
 
 def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
-    detailed = args.D
+    detailed = params['detailed']
 
-    outfmt = args.outfmt
+    outfmt = params['outfmt']
     blocks = metadata['blocks']
     validBlocks = blocks[0]
     invalidBlocks = blocks[1]
@@ -554,12 +559,12 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
     validBlockString = ', '.join(details)
 
 
-    if args.V:
+    if params['validRange']:
         with open(args.V, 'w') as o:
             for block in validBlocks:
                 o.write( '{}\t{}\n'.format( block[0] , block[1] ) )
 
-    if args.I:
+    if params['invalidRange']:
         with open(args.I, 'w') as o:
             for block in invalidBlocks:
                 o.write( '{}\t{}\n'.format( block[0] , block[1] ) )
@@ -575,7 +580,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
         for record in finalAlignment:
             record.description = validBlockString
 
-    if args.H: #JSON
+    if params['H']: #JSON
 
 
 
@@ -589,13 +594,13 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
             h.write(htmlOutput(initialJson, jsonSeq, info, params))
 
 
-    outFilename = filename + '.' + args.outfmt
+    outFilename = filename + '.' + outfmt
     if finalAlignment:
         AlignIO.write([finalAlignment], outFilename, outfmt)
     else:
         print("All positions were removed, try lowering the thresholds.", file = sys.stderr)
 
-    if args.X:
+    if params['discardedBlocks']:
         invalidBlockString = ''
 
         details = []
@@ -611,7 +616,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
         if detailed:
             for record in invalidAlignment:
                 record.description = invalidBlockString
-        AlignIO.write([invalidAlignment], args.X, outfmt)
+        AlignIO.write([invalidAlignment], params['discardedBlocks'], outfmt)
 
 
     return finalAlignment
@@ -763,33 +768,33 @@ def getCGI(filename, params = {}): #Return HTML output for CGI script
 
 
 def main():
-    global args
-    params, args = parseArguments(version)
 
-    alignment, info = filterBlocks(params['filename'], params)
-    metadata = calculateMetadata(alignment, info)
+    params = parseArguments(version)
 
-    initialJson = ''
-    if args.H:
-        # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
-        validSeq = Seq(metadata['validString'])
-        validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
-        scoreSeq = Seq(metadata['scoreString'])
-        scoreSeqRecord = SeqRecord(seq = scoreSeq, id = 'Sc', name = 'Heterozygosity Score')
-        jsonAlignment = MultipleSeqAlignment([validSeqRecord, scoreSeqRecord])
-        for record in alignment:
-            jsonAlignment.append(record)
-        initialJson = getInitialJson(jsonAlignment)
+    for filename in params['filenames']:
+        alignment, info = filterBlocks(filename, params)
+        metadata = calculateMetadata(alignment, info)
 
-    if (args.debug): printAlign(alignment, info)
+        initialJson = ''
+        if params['H']:
+            # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
+            validSeq = Seq(metadata['validString'])
+            validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
+            scoreSeq = Seq(metadata['scoreString'])
+            scoreSeqRecord = SeqRecord(seq = scoreSeq, id = 'Sc', name = 'Heterozygosity Score')
+            jsonAlignment = MultipleSeqAlignment([validSeqRecord, scoreSeqRecord])
+            for record in alignment:
+                jsonAlignment.append(record)
+            initialJson = getInitialJson(jsonAlignment)
 
-    blocks = metadata['blocks']
+        if params['debug']: printAlign(alignment, info)
 
-    if not args.outfile:
-        outfile = params['filename'].split('/')[-1].split('.')[:-1]
-        outfile = '.'.join(outfile)
+        blocks = metadata['blocks']
 
-    writeAlign(alignment, metadata, outfile, initialJson, info, params)
+        outfile = filename.split('/')[-1].split('.')[:-1]
+        outfile = '.'.join(outfile) + '-out'
+
+        writeAlign(alignment, metadata, outfile, initialJson, info, params)
 
 if __name__ == "__main__":
     main()

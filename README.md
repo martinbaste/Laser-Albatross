@@ -17,6 +17,8 @@
   * *All:* Gaps positions are not removed, and they don't count towards the conserved or non conserved calculation of the position. This means that the required amount of identical characters for a position is lower.
 * Info-score info in HTML output
 * Accept parameters and take rest from default
+* Take multiple files as input.
+
 
 
 
@@ -24,7 +26,7 @@
 
 ## Gap support
 
-An example for the difference of partial and all using the standard settings ("conserved" is (0.5 * # of sequences) + 1  and "highly conserved" is 0.85 * # of seqs.) in this case 5 and 7, respectively.
+An example for the difference of partial and all using the standard settings ("conserved" is (0.5 * # of sequences) + 1  and "highly conserved" is 0.85 * # of seqs.) in this case 5 and 7, respectively. This example uses the GBlocks mode, but window mode is similar.
 In this alignment:
 
 
@@ -48,18 +50,14 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 
 
 ## Todo
-* Refactor code
+* Refactor & optimize code
 * Maybe have both alignments in the html scroll at the same time.
 * Maybe integrate with bash pipes? check emboss
 * Add support for ambiguous characters
-* Add polydot chart?
-* Clean params/args stuff
 * Automatic score threshold calculation
-* Score looks really interesting, maybe it can be added a chemical group score and then average.
-* Take multiple files as input.
 
 
 
-## Useful info
+## Interesting info
 
 [Information content](http://www.lecb.ncifcrf.gov/~toms/paper/primer/)
