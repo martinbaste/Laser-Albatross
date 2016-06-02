@@ -10,6 +10,7 @@ from Bio.Align import MultipleSeqAlignment
 import sys
 import argparse
 import json
+import datetime
 
 version = '0.1.1'
 
@@ -30,7 +31,7 @@ defaultParams = {
     'infmt': 'fasta',
     'outfmt': 'fasta',
     'windowSize' : 5,
-    'windowScore' : 7,
+    'windowScore' : 6.5,
     'mode' : 'window',
     'H' : False,
     'debug' : False,
@@ -560,12 +561,12 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
 
     if params['validRange']:
-        with open(args.V, 'w') as o:
+        with open(params['validRange'], 'w') as o:
             for block in validBlocks:
                 o.write( '{}\t{}\n'.format( block[0] , block[1] ) )
 
     if params['invalidRange']:
-        with open(args.I, 'w') as o:
+        with open(params['invalidRange'], 'w') as o:
             for block in invalidBlocks:
                 o.write( '{}\t{}\n'.format( block[0] , block[1] ) )
 
@@ -591,7 +592,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
         jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
         with open(filename + '.html', 'w') as h:
-            h.write(htmlOutput(initialJson, jsonSeq, info, params))
+            h.write(htmlOutput(initialJson, jsonSeq, info, params, filename))
 
 
     outFilename = filename + '.' + outfmt
@@ -621,7 +622,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
     return finalAlignment
 
-def htmlOutput(initialJson, seqJson, info, params, header = True):
+def htmlOutput(initialJson, seqJson, info, params, infile):
     x = []
     y = []
     p = [] # Present
@@ -634,21 +635,29 @@ def htmlOutput(initialJson, seqJson, info, params, header = True):
             p.append(params['windowScore'])
     script = """
     <script>
-        TESTER = document.getElementById('tester');
+        SCOREPLOT = document.getElementById('scoreplot');
         trace1 = {{
         x: {0} ,
         y: {1},
-        type : 'scatter'
+        type : 'scatter',
+        name : 'Score',
+        marker: {{
+            color : '#2980b9'
+        }}
         }};
 
         trace2 = {{
         x: {0} ,
         y: {2},
-        type: 'bar'
+        type: 'bar',
+        name : 'Discarded',
+        marker: {{
+            color : '#bdc3c7'
+        }}
         }};
 
         data = [trace1, trace2];
-        Plotly.plot( TESTER, data , {{margin : {{t : 0}} }});
+        Plotly.plot( SCOREPLOT, data , {{margin : {{t : 0}} }});
     </script>""".format(x, y, p)
 
     head = """
@@ -657,17 +666,96 @@ def htmlOutput(initialJson, seqJson, info, params, header = True):
     <meta charset="utf-8">
     <title>Laser Albatross - Martín Basterrechea</title>
     <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+    <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/grids-responsive.css">
+
+    <link rel="stylesheet" href="http://purecss.io/combo/1.18.13?/css/layouts/blog.css">
     <link rel="stylesheet" href="https://cdn.rawgit.com/wilzbach/msa/master/css/msa.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+      .post {
+        padding-bottom: 0;
+      }
+      #scoreplot {
+        width: 100%;
+        height: 200px;
+      }
+      .button-green {
+        color: white;
+        background: #3498db;
+        border-radius: 4px;
+      }
+      .sidebar {
+        background: #2980b9;
+      }
+      .smenubar_alink {
+        background: #3498db !important;
+      }
+      label {
+        color: #777;
+      }
+      .table-center {
+        font-size: 11px;
+        margin: 40px auto 0 auto;
+      }
+    </style>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>"""
     html = """
 <body>
+    <div id="layout" class="pure-g">
+        <div class="sidebar pure-u-1 pure-u-md-1-4">
+          <div class="header">
+            <h1 class="brand-title">
+              Laser Albatross
+            </h1>
+            <nav class="nav">
+              <ul class="nav-list">
+                <li class="nav-item">
+                  <a class="pure-button" href="/">Home</a>
+                </li>
+                <li class="nav-item">
+                  <a class="pure-button" href="/about.html">About</a>
+                </li>
+              </ul>
+            </nav>
+            table@
+          </div>
+        </div>
+        <div class="content pure-u-1 pure-u-md-3-4">
+          <div class="posts">
+            <section class="post">
+              <header class="post-header">
+                <h2 class="content-subhead">Output alignment <a class="pure-button button-green" href="@download">Download</a> </h2>
+              </header>
+              <div class="post-description">
+                <div id='finalDiv'></div>
+              </div>
+            </section>
+            <section class="post">
+              <header class="post-header">
+                <h2 class="content-subhead">Score plot</h2>
+              </header>
+              <div class="post-description">
+                <div id="scoreplot"></div>
+              </div>
+            </section>
+            <section class="post">
+              <header class="post-header">
+                <h2 class="content-subhead">Original alignment</h2>
+              </header>
+              <div class="post-description">
+                <div id='initialDiv'></div>
+              </div>
+            </section>
 
+          </div>
+
+
+
+        </div>
+    </div>
     <script src="https://cdn.bio.sh/msa/0.4/msa.min.gz.js"></script>
-
-    <div id="tester" style="width:1200px;height:250px;"></div>
-    <div id='initialDiv'></div>
-    <div id='finalDiv'></div>
 
     <script>
       var gffParser = msa.io.gff;
@@ -725,9 +813,23 @@ def htmlOutput(initialJson, seqJson, info, params, header = True):
     plotscript
   </body>
 </html>"""
-    if header:
-        return head + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
-    return html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
+
+    if params['mode'] == 'window':
+        paramkeys = ['time', 'input file', 'infmt', 'mode', 'gaps', 'windowScore', 'windowSize']
+    else:
+        paramkeys = ['time', 'input file', 'infmt', 'mode', 'gaps', 'conserved', 'highly-conserved']
+
+    table = '<div><table class="pure-table pure-table-horizontal table-center">\n<tr><th>Parameter</th><th>Value</th></tr>'
+    now = datetime.datetime.now()
+    for param in paramkeys:
+        if param == 'time':
+            table+= '<tr><td>time:</td><td>' + now.strftime("%Y-%m-%d %H:%M") + '</td>\n'
+        elif param == 'input file':
+            table+= '<tr><td>input file:</td><td>' + infile.split('/')[-1] + '</td>\n'
+        else:
+            table+= '<tr><td>' + param + '</td><td>' + str(params[param]) + '</td>\n'
+    table += '</table></div>'
+    return head + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script).replace("table@", table)
 
 
 def getCGI(filename, params = {}): #Return HTML output for CGI script
@@ -764,7 +866,14 @@ def getCGI(filename, params = {}): #Return HTML output for CGI script
 
     jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
 
-    return(htmlOutput(initialJson, jsonSeq, info, params, header=False))
+    outfmt = params['outfmt']
+    outfile = filename.split('/')[-1].split('.')[:-1]
+    outfile = 'tmp/' + '.'.join(outfile) + '-out' + '.' + outfmt
+
+
+    AlignIO.write([finalAlignment], outfile, outfmt)
+
+    return(htmlOutput(initialJson, jsonSeq, info, params, filename), outfile)
 
 
 def main():
@@ -779,9 +888,9 @@ def main():
         if params['H']:
             # Generate JSON for HTML output, add the "valid blocks" sequence to the initial one.
             validSeq = Seq(metadata['validString'])
-            validSeqRecord = SeqRecord(seq = validSeq, id = 'Vs', name = 'Valid Blocks')
+            validSeqRecord = SeqRecord(seq = validSeq, id = 'Valid blocks', name = 'Valid Blocks')
             scoreSeq = Seq(metadata['scoreString'])
-            scoreSeqRecord = SeqRecord(seq = scoreSeq, id = 'Sc', name = 'Heterozygosity Score')
+            scoreSeqRecord = SeqRecord(seq = scoreSeq, id = 'Score', name = 'Heterozygosity Score')
             jsonAlignment = MultipleSeqAlignment([validSeqRecord, scoreSeqRecord])
             for record in alignment:
                 jsonAlignment.append(record)
