@@ -220,10 +220,15 @@ def scoreMatch(pair, matrix):
     else:
         return matrix[pair]
 
-def filterBlocks(filename, params = None):
+def filterBlocks(filename, params = {}):
     #Read alignment file
-    if params == None:
+    if params == {}:
         params = defaultParams
+    else:
+        for param in defaultParams.keys():
+            if not (param in params):
+                params[param] = defaultParams[param]
+
     alignment = AlignIO.read( open(filename, 'rU'), params['infmt'] )
     #except ValueError as err:
     #    print('Error while opening the file: {}'.format(err), file = sys.stderr)
@@ -479,10 +484,8 @@ def printAlign(alignment, info):
     short = True #Short description, long is for debug
     count = 0
     freq = [0]*10
-    f = open('numbers','w')
     for n in range(length):
         freq[floor(info[n]['H']*10)] += 1
-        f.write(str(info[n]['H']) + '\n')
         s = alignment[:, n]
         if info[n]['S'][6] == 'V':
             count += 1
@@ -492,11 +495,7 @@ def printAlign(alignment, info):
                 print("{} | {}".format(s,n), file = sys.stderr)
             else:
                 print("{} | {} - Deleted".format(s,n), file = sys.stderr)
-    print(count, file = sys.stderr)
-    for n in range(len(freq)):
-        freq[n] = freq[n]/length
-    print(freq)
-    f.close()
+
 
 def calculateMetadata(alignment, info):
     metadata = {}
@@ -538,7 +537,7 @@ def calculateMetadata(alignment, info):
 
     return metadata
 
-def writeAlign(alignment, metadata, filename, initialJson, info):
+def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
     detailed = args.D
 
@@ -587,7 +586,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info):
 
         jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
         with open(filename + '.html', 'w') as h:
-            h.write(htmlOutput(initialJson, jsonSeq, info))
+            h.write(htmlOutput(initialJson, jsonSeq, info, params))
 
 
     outFilename = filename + '.' + args.outfmt
@@ -617,7 +616,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info):
 
     return finalAlignment
 
-def htmlOutput(initialJson, seqJson, info, header = True):
+def htmlOutput(initialJson, seqJson, info, params, header = True):
     x = []
     y = []
     p = [] # Present
@@ -627,7 +626,7 @@ def htmlOutput(initialJson, seqJson, info, header = True):
         if info[n]['S'][6] == 'V':
             p.append(0)
         else:
-            p.append(10)
+            p.append(params['windowScore'])
     script = """
     <script>
         TESTER = document.getElementById('tester');
@@ -722,11 +721,11 @@ def htmlOutput(initialJson, seqJson, info, header = True):
   </body>
 </html>"""
     if header:
-        return header + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
+        return head + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
     return html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script)
 
 
-def getCGI(filename, params = None): #Return HTML output for CGI script
+def getCGI(filename, params = {}): #Return HTML output for CGI script
     alignment, info = filterBlocks(filename, params)
     #Delete file
     metadata = calculateMetadata(alignment, info)
@@ -744,7 +743,7 @@ def getCGI(filename, params = None): #Return HTML output for CGI script
     validBlocks = metadata['blocks'][0]
     invalidBlocks = metadata['blocks'][1]
 
-
+    printAlign(alignment, info)
 
     finalAlignment = False
     for block in validBlocks:
@@ -760,7 +759,7 @@ def getCGI(filename, params = None): #Return HTML output for CGI script
 
     jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
 
-    return(htmlOutput(initialJson, jsonSeq, info, header=False))
+    return(htmlOutput(initialJson, jsonSeq, info, params, header=False))
 
 
 def main():
@@ -790,7 +789,7 @@ def main():
         outfile = params['filename'].split('/')[-1].split('.')[:-1]
         outfile = '.'.join(outfile)
 
-    writeAlign(alignment, metadata, outfile, initialJson, info)
+    writeAlign(alignment, metadata, outfile, initialJson, info, params)
 
 if __name__ == "__main__":
     main()

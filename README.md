@@ -16,6 +16,8 @@
   * *Partial:* Gaps are considered just another allowed character.
   * *All:* Gaps positions are not removed, and they don't count towards the conserved or non conserved calculation of the position. This means that the required amount of identical characters for a position is lower.
 * Info-score info in HTML output
+* Accept parameters and take rest from default
+
 
 
 
@@ -46,7 +48,6 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 
 
 ## Todo
-* Accept parameters and take rest from default
 * Refactor code
 * Maybe have both alignments in the html scroll at the same time.
 * Maybe integrate with bash pipes? check emboss
@@ -55,6 +56,7 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 * Clean params/args stuff
 * Automatic score threshold calculation
 * Score looks really interesting, maybe it can be added a chemical group score and then average.
+* Take multiple files as input.
 
 
 
