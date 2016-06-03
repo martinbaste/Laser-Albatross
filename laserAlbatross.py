@@ -244,10 +244,12 @@ def filterBlocks(filename, params = {}):
             if not (param in params):
                 params[param] = defaultParams[param]
 
-    alignment = AlignIO.read( open(filename, 'rU'), params['infmt'] )
-    #except ValueError as err:
-    #    print('Error while opening the file: {}'.format(err), file = sys.stderr)
-    #    exit()
+    try:
+        alignment = AlignIO.read( open(filename, 'rU'), params['infmt'] )
+    except ValueError as err:
+        print('Error while opening the file: {}'.format(err), file = sys.stderr)
+        print('Maybe the file was not found or the format is incorrect. Use -h for help.')
+        exit()
     length = alignment.get_alignment_length()
 
     #Step 1 in algorithm
