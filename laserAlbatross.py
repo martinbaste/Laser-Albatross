@@ -12,7 +12,7 @@ import argparse
 import json
 import datetime
 
-version = '0.1.1'
+version = '0.2.0'
 
 chmGroup = { #Taken from http://www.ebi.ac.uk/Tools/msa/clustalw2/help/faq.html#24
     'small' : 'AVFPMILW',
@@ -261,13 +261,13 @@ def filterBlocks(filename, params = {}):
         s = alignment[:, n]
         chars = {}
         chars['-'] = 0 #For gap counting
-        if not params['nucleotide']:
-            charGr = { 's': 0, 'a' : 0, 'b' : 0, 'r' : 0, 'o' : 0}
-            for i in s:
-                if i in chars:
-                    chars[i] += 1
-                else:
-                    chars[i] = 1
+        charGr = { 's': 0, 'a' : 0, 'b' : 0, 'r' : 0, 'o' : 0}
+        for i in s:
+            if i in chars:
+                chars[i] += 1
+            else:
+                chars[i] = 1
+            if not params['nucleotide']:
                 if i in chmGroup['small']:
                     charGr['s'] += 1
                 elif i in chmGroup['acidic']:
@@ -305,7 +305,6 @@ def filterBlocks(filename, params = {}):
         for key in chars.keys():
             if key != '-':
                 heterozygosity -= (chars[key]/numSeq)**2
-
 
 
         if not params['nucleotide']:
@@ -463,6 +462,8 @@ def filterBlocks(filename, params = {}):
             else:
                 n['S'][6] = 'X' # Invalid
                 count = 0
+
+
     elif params['mode'] == 'window':
         wSize = params['windowSize']
         for n in range(length - wSize):
@@ -487,9 +488,6 @@ def filterBlocks(filename, params = {}):
                             info[n+i]['S'][6] = 'V'
             info[n]['H'] = avgScore
 
-
-
-
     return(alignment, info)
 
 def getInitialJson(alignment):
@@ -501,20 +499,10 @@ def getInitialJson(alignment):
 def printAlign(alignment, info):
     #Print valid columns
     length = alignment.get_alignment_length()
-    short = True #Short description, long is for debug
-    count = 0
-    freq = [0]*10
     for n in range(length):
-        freq[floor(info[n]['H']*10)] += 1
         s = alignment[:, n]
-        if info[n]['S'][6] == 'V':
-            count += 1
-        if short: print('{s} |  H: {H} | MC: {MC[1]} | TS: {TS} | AS: {AS:.2} | {S} '.format(s = s,**info[n]), file = sys.stderr)
-        else:
-            if info[n]['S'][6] == 'V':
-                print("{} | {}".format(s,n), file = sys.stderr)
-            else:
-                print("{} | {} - Deleted".format(s,n), file = sys.stderr)
+        print('{s} |  H: {H} | MC: {MC[1]} | TS: {TS} | AS: {AS:.2} | {S} '.format(s = s,**info[n]), file = sys.stderr)
+
 
 
 def calculateMetadata(alignment, info):

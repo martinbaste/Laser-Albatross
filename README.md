@@ -51,11 +51,22 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 
 ## Todo
 * Refactor & optimize code
-* Maybe have both alignments in the html scroll at the same time.
-* Maybe integrate with bash pipes? check emboss
-* Add support for ambiguous characters
-* Automatic score threshold calculation
-* Fix nucleotide sequence calculation, shouldn't try to use aminoacids as groups.
+* Main program
+  * Auto-detect if the sequence contains aminoacids or nucleotides.
+  * Automate parameter estimation
+  * Optimize for speed
+  * Code readability and documentation
+  * Add support for ambiguous characters
+  * Maybe integrate with bash pipes? check emboss
+  * Refactor & optimize code
+  * Bug: Sometimes printing html to file throws ascii/utf-8 error.
+* Web version
+  * Delete files after certain time.
+  * Limit file size.
+  * Add more output formats.
+  * Create error messages.
+  * Write an about page.
+  * Add it to GitHub repo.
 
 
 
