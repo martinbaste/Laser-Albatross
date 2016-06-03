@@ -55,6 +55,7 @@ Position 3 has 3 gaps. It would be considered *non conserved* in *partial* setti
 * Maybe integrate with bash pipes? check emboss
 * Add support for ambiguous characters
 * Automatic score threshold calculation
+* Fix nucleotide sequence calculation, shouldn't try to use aminoacids as groups.
 
 
 

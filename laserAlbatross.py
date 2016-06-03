@@ -35,7 +35,8 @@ defaultParams = {
     'mode' : 'window',
     'H' : False,
     'debug' : False,
-    'detailed' : False
+    'detailed' : False,
+    'nucleotide' : False
     }
 
 def parseArguments(version): #Parse arguments
@@ -187,6 +188,13 @@ def parseArguments(version): #Parse arguments
         const = True,
         help = 'Create HTML output file.'
         )
+    parser.add_argument(
+        '-N',
+        action = 'store_const',
+        default = defaultParams['nucleotide'],
+        const = True,
+        help = 'Analyse nucleotide sequence. Default is aminoacid.'
+        )
     args = parser.parse_args()
     filenames = []
     for files in args.infile:
@@ -210,7 +218,8 @@ def parseArguments(version): #Parse arguments
         'detailed' : args.D,
         'validRange' : args.V,
         'invalidRange' : args.I,
-        'discardedBlocks' : args.X
+        'discardedBlocks' : args.X,
+        'nucleotide' : args.N
         }
     return params
 
@@ -252,23 +261,24 @@ def filterBlocks(filename, params = {}):
         s = alignment[:, n]
         chars = {}
         chars['-'] = 0 #For gap counting
-        charGr = { 's': 0, 'a' : 0, 'b' : 0, 'r' : 0, 'o' : 0}
-        for i in s:
-            if i in chars:
-                chars[i] += 1
-            else:
-                chars[i] = 1
-            if i in chmGroup['small']:
-                charGr['s'] += 1
-            elif i in chmGroup['acidic']:
-                charGr['a'] += 1
-            elif i in chmGroup['basic']:
-                charGr['b'] += 1
-            elif i in chmGroup['rest']:
-                charGr['r'] += 1
-            else:
-                if not (allGaps and i == '-'):
-                    charGr['o'] += 1
+        if not params['nucleotide']:
+            charGr = { 's': 0, 'a' : 0, 'b' : 0, 'r' : 0, 'o' : 0}
+            for i in s:
+                if i in chars:
+                    chars[i] += 1
+                else:
+                    chars[i] = 1
+                if i in chmGroup['small']:
+                    charGr['s'] += 1
+                elif i in chmGroup['acidic']:
+                    charGr['a'] += 1
+                elif i in chmGroup['basic']:
+                    charGr['b'] += 1
+                elif i in chmGroup['rest']:
+                    charGr['r'] += 1
+                else:
+                    if not (allGaps and i == '-'):
+                        charGr['o'] += 1
 
         mostCommon = ('-', 0)
         for key in chars.keys():
@@ -296,10 +306,14 @@ def filterBlocks(filename, params = {}):
             if key != '-':
                 heterozygosity -= (chars[key]/numSeq)**2
 
-        heterozygosityGroup = 1
-        for key in charGr.keys():
-            if key != '-':
-                heterozygosityGroup -= (charGr[key]/numSeq)**2
+
+
+        if not params['nucleotide']:
+            heterozygosityGroup = 1
+            for key in charGr.keys():
+                if key != '-':
+                    heterozygosityGroup -= (charGr[key]/numSeq)**2
+            heterozygosity = (heterozygosity + heterozygosityGroup)/2
 
         #Count gaps
         gaps = chars['-']
@@ -323,7 +337,7 @@ def filterBlocks(filename, params = {}):
 
 
         info.append({
-        'H' : (heterozygosity + heterozygosityGroup)/2,
+        'H' : heterozygosity,
         'TS': score,
         'AS': float(avgScore),
         'S': {1 : status },
@@ -592,7 +606,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
         jsonSeq = json.dumps(seqArray, sort_keys=True, indent=4)
         with open(filename + '.html', 'w') as h:
-            h.write(htmlOutput(initialJson, jsonSeq, info, params, filename))
+            h.write(htmlOutput(initialJson, jsonSeq, info, params, filename, False))
 
 
     outFilename = filename + '.' + outfmt
@@ -622,7 +636,7 @@ def writeAlign(alignment, metadata, filename, initialJson, info, params):
 
     return finalAlignment
 
-def htmlOutput(initialJson, seqJson, info, params, infile):
+def htmlOutput(initialJson, seqJson, info, params, infile, CGI = True):
     x = []
     y = []
     p = [] # Present
@@ -696,7 +710,7 @@ def htmlOutput(initialJson, seqJson, info, params, infile):
       }
       .table-center {
         font-size: 11px;
-        margin: 40px auto 0 auto;
+        margin: 40px 0 0 auto;
       }
     </style>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
@@ -825,10 +839,14 @@ def htmlOutput(initialJson, seqJson, info, params, infile):
         if param == 'time':
             table+= '<tr><td>time:</td><td>' + now.strftime("%Y-%m-%d %H:%M") + '</td>\n'
         elif param == 'input file':
-            table+= '<tr><td>input file:</td><td>' + infile.split('/')[-1] + '</td>\n'
+            #table+= '<tr><td>input file:</td><td>' + infile.split('/')[-1].split('-')[-2] + '</td>\n'
+            table+= '<tr><td>input file:</td><td>' + infile + '</td>\n'
         else:
             table+= '<tr><td>' + param + '</td><td>' + str(params[param]) + '</td>\n'
     table += '</table></div>'
+    html = head + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script).replace("table@", table)
+    if not CGI:
+        html = html.replace("@download", infile.split('/')[-1] + '.' + params['outfmt'])
     return head + html.replace("sequences2@", initialJson).replace("sequences@", seqJson).replace("plotscript", script).replace("table@", table)
 
 
